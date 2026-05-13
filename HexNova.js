@@ -1,356 +1,1231 @@
-// =============================================
-//  MULTI GAME PROJECT — sketch.js
-//  Games: Kite | Cricket | Auto Rush
-//  Press 1, 2, 3 to select | M = back to menu
-// =============================================
+// ─────────────────────────────────────────────────────────
+// 🎮 ULTIMATE DESI GAMING ARCADE 
+// (Proper Format + High Scores + Wickets + Runs Logic)
+// ─────────────────────────────────────────────────────────
 
-const W = 400, H = 600;
-let scene = 'menu'; // 'menu' | 'kite' | 'cricket' | 'auto'
+let arcadeState = 'MENU'; 
 
-// ── shared util ──────────────────────────────
-function backHint() {
-  fill(160);
+// ==========================================
+// HIGH SCORE SYSTEM (Saves to Browser)
+// ==========================================
+let highScores = {
+  kite: 0,
+  cricket: 0,
+  rush: 0
+};
+
+// Try to load saved high scores
+try {
+  let saved = localStorage.getItem('desiArcadeHighScores');
+  if (saved) {
+    highScores = JSON.parse(saved);
+  }
+} catch (e) {
+  console.log("Local storage not available");
+}
+
+function saveHighScores() {
+  try {
+    localStorage.setItem('desiArcadeHighScores', JSON.stringify(highScores));
+  } catch (e) { }
+}
+
+// ==========================================
+// 1. KITE DRIFT VARIABLES
+// ==========================================
+let k_W, k_H = 600, k_scaleF, k_wRatio, k_GROUND_Y = 510;
+let k_player, k_enemies, k_score, k_gameOver, k_particles, k_flashTimer;
+
+// ==========================================
+// 2. CRICKET SIXER VARIABLES
+// ==========================================
+let c_state = 'START'; 
+let c_score = 0;
+let c_lastRuns = 0; // Tracks if you hit 1, 2, 4, 6 etc.
+let c_cx, c_H, c_W, c_pitchTop, c_pitchBottom, c_batsmanY, c_hitZoneStart, c_hitZoneEnd;
+let c_ballY = 0, c_ballSpeed = 5, c_ballFlyY = 0, c_ballFlyX = 0, c_ballScale = 10;
+let c_batAngle = 0, c_swingFrames = 0;
+let hitSynth, crowdNoise, crowdEnv;
+let soundInitialized = false;
+
+// ==========================================
+// 3. AUTO RUSH VARIABLES
+// ==========================================
+let r_W, r_H, r_cx, r_roadWidth;
+let r_state = 'START', r_score = 0, r_lives = 3, r_speedMult = 1;
+let r_player = { x: 0, y: 0, speed: 0, maxSpeed: 20, minSpeed: 4, w: 32, h: 54, invulnTimer: 0 };
+let r_roadOffset = 0, r_obstacles = [], r_scenery = [], r_particles = [], r_shakeTimer = 0;
+
+
+// ─── SETUP & WINDOW RESIZE ──────────────────────────────
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  frameRate(60);
+  textAlign(CENTER, CENTER);
+  updateAllLayouts();
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  updateAllLayouts();
+}
+
+function updateAllLayouts() {
+  // Kite Layout
+  k_scaleF = windowHeight / 600;
+  k_W = windowWidth / k_scaleF;
+  k_wRatio = k_W / 400;
+
+  // Cricket Layout
+  c_W = windowWidth;
+  c_H = windowHeight;
+  c_cx = c_W / 2;
+  c_pitchTop = c_H * 0.25;
+  c_pitchBottom = c_H;
+  c_batsmanY = c_H * 0.80;
+  c_hitZoneStart = c_H * 0.70; // Slightly larger zone for 1,2,3 runs
+  c_hitZoneEnd = c_H * 0.85;
+
+  // Auto Rush Layout
+  r_W = windowWidth;
+  r_H = windowHeight;
+  r_cx = r_W / 2;
+  r_roadWidth = min(r_W * 0.85, 500); 
+  r_player.y = r_H * 0.85;
+}
+
+function initSound() {
+  if (!soundInitialized && typeof p5.PolySynth !== 'undefined') {
+    userStartAudio();
+    hitSynth = new p5.MonoSynth();
+    crowdNoise = new p5.Noise('pink');
+    crowdNoise.amp(0);
+    crowdNoise.start();
+    crowdEnv = new p5.Envelope();
+    crowdEnv.setADSR(0.5, 0.2, 0.8, 2.5); 
+    crowdEnv.setRange(0.6, 0); 
+    soundInitialized = true;
+  }
+}
+
+// ─── MAIN DRAW LOOP ────────────────────────────────────
+function draw() {
+  if (arcadeState === 'MENU') {
+    drawMenu();
+  } else if (arcadeState === 'KITE') {
+    drawKiteGame();
+    drawBackButton();
+  } else if (arcadeState === 'CRICKET') {
+    drawCricketGame();
+    drawBackButton();
+  } else if (arcadeState === 'RUSH') {
+    drawAutoRushGame();
+    drawBackButton();
+  }
+}
+
+// ─── UPGRADED MENU UI ──────────────────────────────────
+let menuCards = [];
+function drawMenu() {
+  // Smooth gradient-like background
+  background(15, 20, 30);
+  
+  // Floating Background particles
+  fill(255, 50); 
   noStroke();
-  textSize(11);
-  textAlign(CENTER, BOTTOM);
-  text("Press M for menu", W / 2, H - 8);
+  ellipse(width * 0.2, (frameCount * 0.5) % height, 4, 4);
+  ellipse(width * 0.5, (frameCount * 1.2) % height, 6, 6);
+  ellipse(width * 0.8, (frameCount * 0.8) % height, 3, 3);
+  ellipse(width * 0.3, (frameCount * 1.5) % height, 5, 5);
+  ellipse(width * 0.7, (frameCount * 0.6) % height, 7, 7);
+
+  // Main Banner
+  fill(255, 204, 0);
+  textSize(min(width * 0.08, 50));
+  text("DESI GAMING ARCADE", width / 2, height * 0.12);
+  
+  fill(180, 200, 220);
+  textSize(min(width * 0.035, 18));
+  text("Choose your flavor. Play to beat the High Score!", width / 2, height * 0.18);
+
+  let cardW = min(width * 0.85, 420);
+  let cardH = min(height * 0.2, 130);
+  let startY = height * 0.28;
+  let gap = cardH + 25;
+
+  menuCards = [
+    { id: 'KITE', title: "🪁 Kite Drift", subtitle: "Cut enemy manja from below!", col: [40, 140, 240], hs: highScores.kite, y: startY },
+    { id: 'CRICKET', title: "🏏 Cricket Sixer", subtitle: "Timing is everything. Hit 1s, 4s & 6s!", col: [60, 180, 100], hs: highScores.cricket, y: startY + gap },
+    { id: 'RUSH', title: "🛺 Rickshaw Rush", subtitle: "Endless traffic dodge. Survive!", col: [240, 90, 70], hs: highScores.rush, y: startY + gap * 2 }
+  ];
+
+  for (let card of menuCards) {
+    let isHover = mouseX > width/2 - cardW/2 && mouseX < width/2 + cardW/2 && mouseY > card.y && mouseY < card.y + cardH;
+    
+    // Card Shadow
+    fill(0, 0, 0, 80);
+    rect(width / 2 - cardW / 2 + 4, card.y + 4, cardW, cardH, 15);
+
+    // Card Body
+    fill(isHover ? color(card.col[0] + 20, card.col[1] + 20, card.col[2] + 20) : card.col);
+    rect(width / 2 - cardW / 2, card.y, cardW, cardH, 15);
+    
+    // Text styling
+    textAlign(LEFT, CENTER);
+    fill(255); 
+    textSize(min(width * 0.06, 28)); 
+    text(card.title, width / 2 - cardW / 2 + 20, card.y + cardH * 0.35);
+    
+    fill(255, 255, 255, 200); 
+    textSize(min(width * 0.035, 15)); 
+    text(card.subtitle, width / 2 - cardW / 2 + 20, card.y + cardH * 0.65);
+
+    // High Score Badge
+    textAlign(RIGHT, CENTER);
+    fill(255, 255, 100);
+    textSize(min(width * 0.04, 16));
+    text("Best: " + card.hs, width / 2 + cardW / 2 - 20, card.y + cardH * 0.5);
+  }
+  textAlign(CENTER, CENTER); // Reset for other games
 }
 
-// =============================================
-//  KITE GAME STATE
-// =============================================
-let kite, kScore, kOver;
-
-function kiteReset() {
-  kite = { x: W / 2, y: H / 2, vx: 0, vy: 0, angle: 0, wind: 0, windTimer: 0, windTarget: 0 };
-  kScore = 0;
-  kOver = false;
+function drawBackButton() {
+  let isHover = mouseX > 10 && mouseX < 110 && mouseY > 10 && mouseY < 50;
+  fill(isHover ? 200 : 255, 50, 50, 220);
+  stroke(255); 
+  strokeWeight(2);
+  rect(10, 10, 100, 40, 8);
+  noStroke();
+  fill(255); 
+  textSize(18); 
+  textAlign(CENTER, CENTER);
+  text("< MENU", 60, 30);
 }
 
-function kiteUpdate() {
-  if (kOver) return;
-  kScore += 1 / 60;
+// ─── INPUT HANDLING ────────────────────────────────────
+function mousePressed() {
+  if (!soundInitialized) initSound();
 
-  kite.windTimer++;
-  if (kite.windTimer > random(60, 120)) { kite.windTarget = random(-1.5, 1.5); kite.windTimer = 0; }
-  kite.wind = lerp(kite.wind, kite.windTarget, 0.03);
+  // Check Back Button
+  if (arcadeState !== 'MENU') {
+    if (mouseX > 10 && mouseX < 110 && mouseY > 10 && mouseY < 50) {
+      arcadeState = 'MENU';
+      return; 
+    }
+  }
 
-  kite.vy += 0.18;
-  kite.vx += kite.wind * 0.07;
-  kite.vx *= 0.97;
-  kite.vy *= 0.97;
-  kite.x += kite.vx;
-  kite.y += kite.vy;
-  kite.x = constrain(kite.x, 20, W - 20);
-  kite.angle = lerp(kite.angle, kite.wind * 18, 0.07);
+  if (arcadeState === 'MENU') {
+    let cardW = min(width * 0.85, 420);
+    let cardH = min(height * 0.2, 130);
+    for (let card of menuCards) {
+      if (mouseX > width/2 - cardW/2 && mouseX < width/2 + cardW/2 && mouseY > card.y && mouseY < card.y + cardH) {
+        arcadeState = card.id;
+        if (card.id === 'KITE') { k_resetGame(); }
+        if (card.id === 'CRICKET') { c_enterGame(); }
+        if (card.id === 'RUSH') { r_resetGame(); r_state = 'START'; }
+        break;
+      }
+    }
+  } 
+  else if (arcadeState === 'KITE') {
+    if (k_gameOver) {
+      k_resetGame();
+      return;
+    }
+    k_player.vy -= 5.8;
+    k_player.vy = max(k_player.vy, -7.5);
+  } 
+  else if (arcadeState === 'CRICKET') {
+    if (c_state === 'START' || c_state === 'OVER') {
+      c_resetGame();
+      return;
+    }
+    
+    if (c_state === 'PLAY') {
+      c_swingFrames = 12; 
+      
+      // Timing Check for Runs
+      if (c_ballY > c_hitZoneStart && c_ballY < c_hitZoneEnd) {
+        c_state = 'HIT';
+        
+        // Calculate accuracy based on how close to center of zone
+        let zoneCenter = (c_hitZoneStart + c_hitZoneEnd) / 2;
+        let maxDiff = (c_hitZoneEnd - c_hitZoneStart) / 2;
+        let diff = abs(c_ballY - zoneCenter);
+        let accuracy = 1 - (diff / maxDiff); // 0 to 1
+        
+        if (accuracy > 0.85) c_lastRuns = 6;
+        else if (accuracy > 0.65) c_lastRuns = 4;
+        else if (accuracy > 0.40) c_lastRuns = 3;
+        else if (accuracy > 0.20) c_lastRuns = 2;
+        else c_lastRuns = 1;
 
-  if (kite.y >= H - 10) { kOver = true; kite.y = H - 10; }
-  if (kite.y < 10)       { kite.y = 10; kite.vy = 0; }
-}
+        c_score += c_lastRuns;
+        
+        // Update High Score
+        if (c_score > highScores.cricket) {
+          highScores.cricket = c_score;
+          saveHighScores();
+        }
 
-function kiteDraw() {
-  background(15, 15, 35);
+        c_ballFlyY = c_ballY;
+        c_ballFlyX = 0;
 
-  // score
-  noStroke(); fill(255); textSize(16); textAlign(LEFT, TOP);
-  text("Score: " + floor(kScore), 12, 12);
-  backHint();
-
-  if (!kOver) {
-    kiteUpdateAndDraw();
-  } else {
-    kiteUpdateAndDraw();
-    fill(0, 0, 0, 160); noStroke(); rect(0, 0, W, H);
-    fill(255, 80, 100); textSize(38); textAlign(CENTER, CENTER);
-    text("Game Over", W / 2, H / 2 - 40);
-    fill(255); textSize(20);
-    text("Score: " + floor(kScore), W / 2, H / 2 + 10);
-    fill(180); textSize(13);
-    text("Click to restart", W / 2, H / 2 + 50);
+        if (soundInitialized) {
+          hitSynth.play('C5', 1, 0, 0.1); 
+          if (c_lastRuns >= 4) {
+            setTimeout(() => crowdEnv.play(crowdNoise), 200); 
+          }
+        }
+      } else {
+        c_state = 'OVER';
+      }
+    }
+  } 
+  else if (arcadeState === 'RUSH') {
+    if (r_state === 'START' || r_state === 'OVER') {
+      r_resetGame();
+      r_state = 'PLAY';
+    }
   }
 }
 
-function kiteUpdateAndDraw() {
-  kiteUpdate();
-  let x = kite.x, y = kite.y, a = kite.angle;
-  push(); translate(x, y); rotate(radians(a));
-  // tail
-  noFill(); strokeWeight(1.5);
-  let cx = 0, cy = 28;
-  for (let i = 0; i < 7; i++) {
-    let wave = sin(frameCount * 0.1 + i * 0.9) * (i * 1.8);
-    let nx = cx + wave, ny = cy + 9;
-    stroke(255, 140, 60, lerp(200, 30, i / 7));
-    line(cx, cy, nx, ny); cx = nx; cy = ny;
+
+// =========================================================================
+// 1. KITE DRIFT (Proper Expansion & Reduced Player Wind)
+// =========================================================================
+function k_resetGame() {
+  k_player = { 
+    x: k_W / 2, y: k_H / 2, 
+    vy: 0, vx: 0, angle: 0, 
+    wind: 0, windTimer: 0, windTarget: 0, string: [] 
+  };
+  k_enemies = []; 
+  k_particles = []; 
+  k_score = 0; 
+  k_gameOver = false; 
+  k_flashTimer = 0;
+
+  for (let i = 0; i < 3; i++) {
+    k_spawnEnemy(true);
   }
-  // body
-  noStroke(); fill(220, 60, 100);
-  beginShape(); vertex(0,-28); vertex(20,0); vertex(0,28); vertex(-20,0); endShape(CLOSE);
-  fill(255, 100, 140);
-  beginShape(); vertex(0,-28); vertex(20,0); vertex(0,0); vertex(-20,0); endShape(CLOSE);
-  stroke(255,255,255,60); strokeWeight(0.6);
-  line(0,-28,0,28); line(-20,0,20,0);
+}
+
+function k_spawnEnemy(initial) {
+  let side = random() > 0.5 ? 1 : -1;
+  let x = side === 1 ? k_W + 30 : -30;
+  let y = random(60, k_GROUND_Y - 60);
+  
+  let palette = [
+    [80,200,120], [240,160,40], [60,160,255], 
+    [200,80,255], [255,200,40], [255,100,60]
+  ];
+  let col = random(palette);
+  let baseVx = random(1.2, 2.2) * k_wRatio;
+  
+  k_enemies.push({ 
+    x: x, 
+    y: y, 
+    vx: side === -1 ? baseVx : -baseVx, 
+    vy: random(-0.4, 0.4), 
+    angle: 0, 
+    wind: 0, 
+    windTimer: 0, 
+    windTarget: random(-1, 1) * k_wRatio, 
+    hue: col, 
+    string: [], 
+    alive: true 
+  });
+}
+
+function k_burst(x, y, col) {
+  for (let i = 0; i < 18; i++) {
+    let a = random(TWO_PI); 
+    let spd = random(1.5, 5);
+    k_particles.push({ 
+      x: x, 
+      y: y, 
+      vx: cos(a)*spd, 
+      vy: sin(a)*spd, 
+      life: 1, 
+      col: col, 
+      r: random(2, 5) 
+    });
+  }
+}
+
+function k_drawScenery() {
+  // Sky Gradient
+  for (let i = 0; i <= 30; i++) {
+    let t = i / 30; 
+    stroke(lerp(100,185,t), lerp(180,225,t), lerp(240,250,t)); 
+    strokeWeight(k_GROUND_Y / 30 + 1);
+    line(0, (k_GROUND_Y / 30) * i, k_W, (k_GROUND_Y / 30) * i);
+  }
+  noStroke();
+  
+  // Sun
+  fill(255, 230, 80, 70); ellipse(k_W * 0.82, 62, 72);
+  fill(255, 225, 50, 90); ellipse(k_W * 0.82, 62, 54);
+  fill(255, 215, 30); ellipse(k_W * 0.82, 62, 42);
+
+  // Clouds
+  k_drawCloud(k_W * 0.15, 70, 1.0); 
+  k_drawCloud(k_W * 0.50, 50, 0.8); 
+  k_drawCloud(k_W * 0.77, 85, 0.7);
+
+  // Birds
+  stroke(50, 60, 90); 
+  strokeWeight(1.5); 
+  noFill();
+  let birds = [
+    [k_W*0.18, k_H*0.13], [k_W*0.22, k_H*0.12], 
+    [k_W*0.44, k_H*0.09], [k_W*0.48, k_H*0.095], [k_W*0.60, k_H*0.14]
+  ];
+  for (let [bx, by] of birds) { 
+    let s = 7; 
+    arc(bx - s * 0.6, by, s * 1.1, s * 0.6, PI, TWO_PI); 
+    arc(bx + s * 0.6, by, s * 1.1, s * 0.6, PI, TWO_PI); 
+  }
+  noStroke();
+
+  // Distant Hills
+  fill(155, 195, 125, 180); 
+  ellipse(k_W * 0.15, k_GROUND_Y + 4, k_W * 0.44, 80); 
+  ellipse(k_W * 0.55, k_GROUND_Y + 4, k_W * 0.50, 70); 
+  ellipse(k_W * 0.88, k_GROUND_Y + 4, k_W * 0.38, 75);
+  
+  // Ground
+  fill(95, 160, 65); 
+  rect(0, k_GROUND_Y, k_W, k_H - k_GROUND_Y); 
+  fill(125, 190, 80); 
+  rect(0, k_GROUND_Y, k_W, 8);
+  
+  // Dirt Path
+  fill(190, 162, 105, 210); 
+  beginShape(); 
+  vertex(k_W * 0.39, k_GROUND_Y); 
+  vertex(k_W * 0.61, k_GROUND_Y); 
+  vertex(k_W * 0.76, k_H); 
+  vertex(k_W * 0.24, k_H); 
+  endShape(CLOSE);
+
+  // Scenery Objects
+  k_drawTree(k_W * 0.05, k_GROUND_Y, 80); 
+  k_drawTree(k_W * 0.14, k_GROUND_Y, 65); 
+  k_drawTree(k_W * 0.76, k_GROUND_Y, 75); 
+  k_drawTree(k_W * 0.87, k_GROUND_Y, 85); 
+  k_drawTree(k_W * 0.94, k_GROUND_Y, 60);
+  k_drawHouse(k_W * 0.27, k_GROUND_Y, 100, 62); 
+  k_drawHouse(k_W * 0.60, k_GROUND_Y, 90, 56);
+}
+
+function k_drawCloud(cx, cy, sc) { 
+  noStroke(); fill(255, 255, 255, 210); 
+  ellipse(cx, cy, 55 * sc, 30 * sc); 
+  ellipse(cx - 22 * sc, cy + 6 * sc, 38 * sc, 24 * sc); 
+  ellipse(cx + 22 * sc, cy + 6 * sc, 38 * sc, 24 * sc); 
+  ellipse(cx, cy + 10 * sc, 50 * sc, 22 * sc); 
+}
+
+function k_drawTree(x, gy, tH) { 
+  let tW = tH * 0.14; 
+  let trH = tH * 0.36; 
+  let cr = tH * 0.48; 
+  fill(115, 75, 35); noStroke(); 
+  rect(x - tW / 2, gy - trH, tW, trH, 3); 
+  fill(45, 135, 55); 
+  ellipse(x, gy - trH - cr * 0.5, cr * 1.9, cr * 1.4); 
+  fill(60, 160, 65); 
+  ellipse(x - cr * 0.18, gy - trH - cr * 0.85, cr * 1.5, cr * 1.2); 
+  fill(80, 185, 72); 
+  ellipse(x + cr * 0.1, gy - trH - cr * 1.1, cr * 1.1, cr); 
+}
+
+function k_drawHouse(cx, gy, hw, hh) { 
+  let wallH = hh * 0.60; let roofH = hh * 0.50; 
+  fill(240, 215, 170); noStroke(); 
+  rect(cx - hw / 2, gy - wallH, hw, wallH); 
+  fill(185, 65, 50); 
+  triangle(cx - hw / 2 - 6, gy - wallH, cx + hw / 2 + 6, gy - wallH, cx, gy - wallH - roofH); 
+  fill(170, 215, 235); stroke(150, 120, 70); strokeWeight(1); 
+  rect(cx - hw * 0.30, gy - wallH * 0.68, hw * 0.28, wallH * 0.28, 2); noStroke(); 
+  fill(130, 85, 45); 
+  let dw = hw * 0.20, dh = wallH * 0.44; 
+  rect(cx + hw * 0.10, gy - dh, dw, dh, dw * 0.35); 
+}
+
+function drawKiteGame() {
+  push();
+  scale(k_scaleF);
+  k_drawScenery();
+
+  if (k_flashTimer > 0) { 
+    noStroke(); 
+    fill(255, 255, 100, k_flashTimer * 4); 
+    rect(0, 0, k_W, k_H); 
+    k_flashTimer--; 
+  }
+
+  if (!k_gameOver) {
+    k_score += 1 / 60;
+    
+    // Update High Score
+    if (floor(k_score) > highScores.kite) {
+      highScores.kite = floor(k_score);
+      saveHighScores();
+    }
+
+    // --- PLAYER WIND REDUCED HERE ---
+    k_player.windTimer++; 
+    if (k_player.windTimer > random(60, 120)) { 
+      // Reduced from 1.5 to 0.7 for much better control
+      k_player.windTarget = random(-0.7, 0.7) * k_wRatio; 
+      k_player.windTimer = 0; 
+    }
+    
+    k_player.wind = lerp(k_player.wind, k_player.windTarget, 0.02); // Smoother lerp
+    k_player.vy += 0.18; 
+    k_player.vx += k_player.wind * 0.07; 
+    k_player.vx *= 0.97; 
+    k_player.vy *= 0.97; 
+    k_player.x += k_player.vx; 
+    k_player.y += k_player.vy; 
+    k_player.x = constrain(k_player.x, 20, k_W - 20); 
+    k_player.angle = lerp(k_player.angle, k_player.wind * 18, 0.07);
+    
+    k_player.string.unshift({ x: k_player.x, y: k_player.y }); 
+    if (k_player.string.length > 22) k_player.string.pop();
+    
+    if (k_player.y >= k_GROUND_Y - 10) { 
+      k_gameOver = true; 
+      k_player.y = k_GROUND_Y - 10; 
+    } 
+    if (k_player.y < 10) { 
+      k_player.y = 10; 
+      k_player.vy = 0; 
+    }
+
+    // Enemy Loop
+    for (let e of k_enemies) {
+      if (!e.alive) continue;
+      
+      e.windTimer++; 
+      if (e.windTimer > random(80, 160)) { 
+        e.windTarget = random(-1, 1) * k_wRatio; 
+        e.windTimer = 0; 
+      }
+      
+      e.wind = lerp(e.wind, e.windTarget, 0.025); 
+      e.vy += e.wind * 0.05; 
+      e.vy *= 0.97; 
+      e.vx *= 0.995; 
+      e.x += e.vx; 
+      e.y += e.vy; 
+      e.y = constrain(e.y, 40, k_GROUND_Y - 50); 
+      e.angle = lerp(e.angle, e.wind * 15, 0.06);
+      
+      e.string.unshift({ x: e.x, y: e.y }); 
+      if (e.string.length > 20) e.string.pop();
+      
+      let dx = k_player.x - e.x; 
+      let dy = k_player.y - e.y; 
+      let dist = sqrt(dx * dx + dy * dy);
+      
+      if (dist < 38) {
+        if (k_player.y > e.y) { 
+          e.alive = false; 
+          k_flashTimer = 12; 
+          k_burst(e.x, e.y, e.hue); 
+          k_spawnEnemy(false); 
+          k_score += 10; 
+        } 
+        else if (e.y > k_player.y) { 
+          k_gameOver = true; 
+          k_burst(k_player.x, k_player.y, [255, 60, 100]); 
+          k_flashTimer = 20; 
+        } 
+        else { 
+          k_player.vx -= dx * 0.05; 
+          k_player.vy -= dy * 0.05; 
+        } 
+        continue;
+      }
+      
+      for (let i = 0; i < e.string.length - 1; i++) {
+        let mx = (e.string[i].x + e.string[i + 1].x) / 2; 
+        let my = (e.string[i].y + e.string[i + 1].y) / 2;
+        let sdx = k_player.x - mx, sdy = k_player.y - my;
+        
+        if (sqrt(sdx * sdx + sdy * sdy) < 14) { 
+          if (k_player.y > my) { 
+            e.alive = false; 
+            k_flashTimer = 12; 
+            k_burst(e.x, e.y, e.hue); 
+            k_spawnEnemy(false); 
+            k_score += 5; 
+          } 
+          break; 
+        }
+      }
+      
+      if (e.y > k_player.y) {
+        for (let i = 0; i < e.string.length - 1; i++) {
+          let mx = (e.string[i].x + e.string[i + 1].x) / 2; 
+          let my = (e.string[i].y + e.string[i + 1].y) / 2;
+          let sdx = k_player.x - mx, sdy = k_player.y - my;
+          
+          if (sqrt(sdx * sdx + sdy * sdy) < 14 && my < k_player.y) { 
+            k_gameOver = true; 
+            k_burst(k_player.x, k_player.y, [255, 60, 100]); 
+            k_flashTimer = 20; 
+            break; 
+          }
+        }
+      }
+    }
+    
+    k_enemies = k_enemies.filter(e => e.alive);
+    if (k_enemies.length < min(3 + floor(k_score / 20), 7) && frameCount % 120 === 0) {
+      k_spawnEnemy(false);
+    }
+
+    for (let pt of k_particles) { 
+      pt.x += pt.vx; 
+      pt.y += pt.vy; 
+      pt.vy += 0.1; 
+      pt.vx *= 0.95; 
+      pt.vy *= 0.95; 
+      pt.life -= 0.03; 
+    }
+    k_particles = k_particles.filter(pt => pt.life > 0);
+  }
+
+  // Draw Strings
+  for (let e of k_enemies) {
+    if (e.string.length < 2) continue; 
+    noFill(); strokeWeight(0.8); 
+    for (let i = 0; i < e.string.length - 1; i++) { 
+      let t = 1 - i / e.string.length; 
+      stroke(e.hue[0], e.hue[1], e.hue[2], t * 180); 
+      line(e.string[i].x, e.string[i].y, e.string[i + 1].x, e.string[i + 1].y); 
+    }
+  }
+  
+  if (k_player.string.length >= 2) {
+    noFill(); strokeWeight(1.2); 
+    for (let i = 0; i < k_player.string.length - 1; i++) { 
+      let t = 1 - i / k_player.string.length; 
+      stroke(180, 120, 40, t * 180); 
+      line(k_player.string[i].x, k_player.string[i].y, k_player.string[i + 1].x, k_player.string[i + 1].y); 
+    }
+  }
+
+  for (let e of k_enemies) k_drawKite(e.x, e.y, e.angle, e.hue, 20, 28, false);
+  
+  for (let pt of k_particles) { 
+    let [r, g, b] = pt.col; noStroke(); 
+    fill(r, g, b, pt.life * 220); 
+    ellipse(pt.x, pt.y, pt.r * pt.life * 2); 
+  }
+  
+  k_drawKite(k_player.x, k_player.y, k_player.angle, [220, 50, 20], 22, 32, true);
+
+  // Top UI
+  noStroke(); 
+  fill(0, 0, 0, 80); 
+  rect(k_W / 2 - 120, 8, 240, 28, 14); 
+  fill(255, 250, 220); 
+  textSize(14); 
+  textAlign(CENTER, CENTER); 
+  text("Score: " + floor(k_score) + "   |   High: " + highScores.kite, k_W / 2, 23);
+  
+  fill(60, 40, 10, 200); 
+  textSize(11); 
+  textAlign(LEFT, TOP); 
+  text("Rivals: " + k_enemies.length, 10, 12);
+  
+  fill(60, 40, 10, 150); 
+  textSize(10); 
+  textAlign(CENTER, BOTTOM); 
+  text("Go BELOW enemy to cut  •  Don't let them get below you!", k_W / 2, k_H - 6);
+
+  if (k_gameOver) {
+    fill(0, 0, 0, 160); noStroke(); rect(0, 0, k_W, k_H); 
+    fill(255, 80, 40); textSize(38); textAlign(CENTER, CENTER); 
+    text("KITE CUT!", k_W / 2, k_H / 2 - 60);
+    
+    fill(255, 220, 80); textSize(15); 
+    text("An enemy got below and cut your string!", k_W / 2, k_H / 2 - 20);
+    
+    fill(255, 255, 255, 220); textSize(22); 
+    text("Score: " + floor(k_score), k_W / 2, k_H / 2 + 18);
+    
+    fill(200, 230, 255, 200); textSize(13); 
+    text("Click to fly again", k_W / 2, k_H / 2 + 60);
+  }
   pop();
 }
 
-// =============================================
-//  CRICKET GAME STATE
-// =============================================
-let cBall, cBat, cScore, cOver, cState;
-
-function cricketReset() {
-  cBat = { x: 340, y: H / 2, len: 80 };
-  cScore = 0; cOver = false; cState = 'incoming';
-  cricketNewBall();
-}
-
-function cricketNewBall() {
-  cBall = { x: 0, y: random(H * 0.35, H * 0.65), vx: 4 + cScore * 0.25, vy: 0, r: 12 };
-  cState = 'incoming';
-}
-
-function cricketUpdate() {
-  if (cOver) return;
-  if (cState === 'incoming') {
-    cBall.x += cBall.vx;
-    if (cBall.x > W + cBall.r) { cOver = true; }
+function k_drawKite(x, y, angleDeg, col, w, h, isPlayer) {
+  push(); 
+  translate(x, y); 
+  rotate(radians(angleDeg)); 
+  let [r, g, b] = col; 
+  noFill(); 
+  strokeWeight(1.4); 
+  let cx = 0, cy = h;
+  
+  for (let i = 0; i < 7; i++) { 
+    let wave = sin(frameCount * 0.1 + i * 0.9) * (i * 1.8); 
+    let nx = cx + wave, ny = cy + 9; 
+    let t = i / 7; stroke(r, g, b, lerp(200, 30, t)); 
+    line(cx, cy, nx, ny); 
+    cx = nx; cy = ny; 
   }
-  if (cState === 'hit') {
-    cBall.vy += 0.25;
-    cBall.x += cBall.vx;
-    cBall.y += cBall.vy;
-    if (cBall.x > W + cBall.r || cBall.y > H + cBall.r) cricketNewBall();
+  
+  noStroke(); 
+  fill(r, g, b, isPlayer ? 50 : 35); 
+  beginShape(); vertex(0, -(h + 3)); vertex(w + 3, 2); vertex(0, h + 3); vertex(-(w + 3), 2); endShape(CLOSE);
+  
+  fill(r * 0.85, g * 0.85, b * 0.85); 
+  beginShape(); vertex(0, -h); vertex(w, 0); vertex(0, h); vertex(-w, 0); endShape(CLOSE);
+  
+  fill(min(r + 40, 255), min(g + 40, 255), min(b + 40, 255)); 
+  beginShape(); vertex(0, -h); vertex(w, 0); vertex(0, 0); vertex(-w, 0); endShape(CLOSE);
+  
+  stroke(255, 255, 255, 80); 
+  strokeWeight(0.6); 
+  line(0, -h, 0, h); 
+  line(-w, 0, w, 0);
+  
+  if (isPlayer) { 
+    noFill(); stroke(255, 255, 255, 60); 
+    strokeWeight(0.5); 
+    ellipse(0, 0, (w + h) * 0.7); 
+  } 
+  pop();
+}
+
+
+// =========================================================================
+// 2. CRICKET SIXER (Wickets & Runs Timing Expanded)
+// =========================================================================
+function c_enterGame() { 
+  c_score = 0; 
+  c_state = 'START'; 
+  c_ballY = c_pitchTop; 
+  c_swingFrames = 0; 
+  c_batAngle = 0; 
+}
+
+function c_resetGame() { 
+  c_score = 0; 
+  c_nextBall(); 
+}
+
+function c_nextBall() { 
+  c_ballY = c_pitchTop; 
+  c_ballSpeed = random(c_H * 0.012, c_H * 0.018); 
+  c_state = 'PLAY'; 
+}
+
+function c_drawEnvironment() {
+  background(60, 160, 60); 
+  
+  fill(50, 100, 200); 
+  arc(c_cx, c_pitchTop - 100, c_W * 1.5, c_H * 0.6, 0, PI); 
+  fill(200); 
+  arc(c_cx, c_pitchTop - 100, c_W * 1.4, c_H * 0.5, 0, PI); 
+  fill(180, 50, 50); 
+  arc(c_cx, c_pitchTop - 100, c_W * 1.2, c_H * 0.4, 0, PI);
+  
+  fill(210, 180, 140); 
+  stroke(255); 
+  strokeWeight(2); 
+  let pitchTopW = c_W * 0.15; 
+  let pitchBotW = c_W * 0.35;
+  quad(
+    c_cx - pitchTopW, c_pitchTop, 
+    c_cx + pitchTopW, c_pitchTop, 
+    c_cx + pitchBotW, c_pitchBottom, 
+    c_cx - pitchBotW, c_pitchBottom
+  );
+  
+  line(c_cx - pitchBotW * 0.8, c_batsmanY, c_cx + pitchBotW * 0.8, c_batsmanY); 
+  line(c_cx - pitchTopW * 1.1, c_pitchTop + 30, c_cx + pitchTopW * 1.1, c_pitchTop + 30); 
+  noStroke();
+}
+
+function c_drawWickets() {
+  push();
+  // Place wickets directly behind the batsman on the crease
+  translate(c_cx, c_batsmanY + 30); 
+  fill(220, 180, 50);
+  
+  // 3 Stumps
+  rect(-12, -45, 5, 45, 2);
+  rect(-2.5, -45, 5, 45, 2);
+  rect(7, -45, 5, 45, 2);
+  
+  // 2 Bails
+  fill(200, 150, 30);
+  rect(-12, -47, 10, 3, 2);
+  rect(-1, -47, 10, 3, 2);
+  
+  pop();
+}
+
+function c_drawBatsman() {
+  push(); 
+  translate(c_cx, c_batsmanY); 
+  
+  fill(255, 204, 0); 
+  rect(-15, -40, 30, 40, 5); 
+  
+  fill(255); 
+  rect(-15, 0, 10, 35); 
+  rect(5, 0, 10, 35); 
+  
+  fill(0, 51, 153); 
+  ellipse(0, -50, 26, 26);
+  
+  stroke(200); 
+  strokeWeight(2); 
+  line(-10, -45, 10, -45); 
+  noStroke(); 
+  
+  push(); 
+  translate(15, -30); 
+  rotate(c_batAngle); 
+  
+  fill(50); 
+  rect(-3, 0, 6, 20); 
+  
+  fill(200, 150, 50); 
+  rect(-6, 20, 12, 45, 2); 
+  
+  pop(); 
+  pop();
+}
+
+function drawCricketGame() {
+  c_drawEnvironment(); 
+  
+  // Draw Wickets BEFORE batsman so they are behind him
+  c_drawWickets();
+  
+  c_drawBatsman();
+
+  if (c_state === 'START') { 
+    fill(0, 150); rect(0, 0, c_W, c_H); 
+    fill(255); stroke(0); strokeWeight(2); textSize(30); 
+    text("TAP TO START GAME", c_cx, c_H / 2); 
+    return; 
+  }
+
+  if (c_state === 'PLAY') {
+    c_ballY += c_ballSpeed; 
+    c_ballScale = map(c_ballY, c_pitchTop, c_batsmanY, 8, 25);
+    
+    fill(200, 30, 30); stroke(255, 255, 255, 150); strokeWeight(1); 
+    ellipse(c_cx, c_ballY, c_ballScale, c_ballScale); 
+    noStroke();
+    
+    if (c_ballY > c_batsmanY + 40) {
+      c_state = 'OVER';
+    }
+  } 
+  else if (c_state === 'HIT') {
+    // Ball flying animation
+    c_ballFlyY -= (c_H * 0.02); 
+    c_ballFlyX += random(-3, 3); 
+    
+    let flyScale = map(c_ballFlyY, c_batsmanY, 0, 25, 4); 
+    fill(200, 30, 30); stroke(255, 255, 255, 150); strokeWeight(1); 
+    ellipse(c_cx + c_ballFlyX, c_ballFlyY, max(flyScale, 2)); 
+    noStroke();
+    
+    // Display different text based on runs
+    if (c_lastRuns === 6) { fill(255, 204, 0); }
+    else if (c_lastRuns === 4) { fill(100, 200, 255); }
+    else { fill(255); }
+    
+    stroke(0); strokeWeight(5); textSize(c_H * 0.08); 
+    if (c_lastRuns === 6) text("SIX!", c_cx, c_H * 0.4);
+    else if (c_lastRuns === 4) text("FOUR!", c_cx, c_H * 0.4);
+    else text(c_lastRuns + " RUNS", c_cx, c_H * 0.4);
+    
+    noStroke();
+    if (c_ballFlyY < -50) c_nextBall();
+  } 
+  else if (c_state === 'OVER') {
+    fill(200, 30, 30); stroke(255, 255, 255, 150); strokeWeight(1); 
+    ellipse(c_cx, c_ballY, c_ballScale, c_ballScale); 
+    noStroke();
+    
+    fill(255, 50, 50); stroke(255); strokeWeight(4); textSize(c_H * 0.1); 
+    text("OUT!", c_cx, c_H * 0.4); 
+    fill(255); stroke(0); strokeWeight(2); textSize(c_H * 0.04); 
+    text("GAME OVER\nTap to Restart", c_cx, c_H * 0.55);
+  }
+
+  if (c_swingFrames > 0) { 
+    c_batAngle = lerp(c_batAngle, PI / 1.5, 0.3); 
+    c_swingFrames--; 
+  } else { 
+    c_batAngle = lerp(c_batAngle, 0, 0.2); 
+  }
+
+  // Draw Hit Zone (Gradient coloring from Red -> Green -> Red)
+  if (c_state === 'PLAY') { 
+    let zoneW = c_W * 0.3; 
+    let zoneHeight = c_hitZoneEnd - c_hitZoneStart;
+    
+    // Draw center optimal line (Green)
+    stroke(0, 255, 0, 150); 
+    strokeWeight(3);
+    let centerZone = c_hitZoneStart + (zoneHeight / 2);
+    line(c_cx - zoneW, centerZone, c_cx + zoneW, centerZone);
+    
+    // Draw outer limits (Red)
+    stroke(255, 50, 50, 150); 
+    strokeWeight(1); 
+    line(c_cx - zoneW, c_hitZoneStart, c_cx + zoneW, c_hitZoneStart); 
+    line(c_cx - zoneW, c_hitZoneEnd, c_cx + zoneW, c_hitZoneEnd); 
+    noStroke(); 
+  }
+
+  // Top Bar HUD
+  fill(0, 180); rect(0, 0, c_W, 60); 
+  fill(255); textSize(24); 
+  textAlign(LEFT, CENTER); text("SCORE: " + c_score, 20, 30);
+  textAlign(RIGHT, CENTER); text("HIGH SCORE: " + highScores.cricket, c_W - 20, 30);
+  textAlign(CENTER, CENTER); // Reset
+}
+
+
+// =========================================================================
+// 3. AUTO RUSH (Fully Expanded Rickshaw & Code)
+// =========================================================================
+function r_resetGame() {
+  r_score = 0; 
+  r_lives = 3; 
+  r_speedMult = 1;
+  r_player.x = r_cx; 
+  r_player.speed = r_player.minSpeed;
+  r_obstacles = []; 
+  r_scenery = []; 
+  r_particles = []; 
+  r_roadOffset = 0;
+  
+  for(let i = 0; i < 15; i++) {
+    r_spawnScenery(random(r_H));
   }
 }
 
-function cricketDraw() {
-  background(245);
-  cricketUpdate();
+function r_spawnObstacle() {
+  let laneBase = random([r_cx - r_roadWidth*0.28, r_cx, r_cx + r_roadWidth*0.28]);
+  let obsX = laneBase + random(-40, 40); 
 
-  // hit zone guide
-  noFill(); stroke(100, 200, 100, 80); strokeWeight(1);
-  rect(cBat.x - 45, cBat.y - cBat.len / 2, 45, cBat.len, 4);
+  let typeNum = random(); 
+  let type = typeNum > 0.85 ? 'COW' : (typeNum > 0.6 ? 'TRUCK' : 'CAR');
+  
+  let speed = 0; 
+  let w = 34, h = 64;
+  
+  if (type === 'CAR') { 
+    speed = random(6, 10); 
+    h = 64; 
+  } else if (type === 'TRUCK') { 
+    speed = random(4, 7); 
+    w = 46; 
+    h = 100; 
+  } else if (type === 'COW') { 
+    speed = 0; 
+    w = 25; 
+    h = 35; 
+  } 
+  
+  r_obstacles.push({ 
+    x: obsX, y: -100, w: w, h: h, speed: speed, type: type, 
+    color: [random(100,255), random(100,255), random(100,255)], 
+    passed: false 
+  });
+}
 
-  // bat
-  stroke(80, 50, 20); strokeWeight(6);
-  line(cBat.x, cBat.y - cBat.len / 2, cBat.x, cBat.y + cBat.len / 2);
+function r_spawnScenery(y) {
+  let isLeft = random() > 0.5; 
+  let type = random() > 0.8 ? 'SHOP' : 'TREE';
+  let x = isLeft ? random(0, r_cx - r_roadWidth/2 - 40) : random(r_cx + r_roadWidth/2 + 40, r_W);
+  r_scenery.push({ x: x, y: y, type: type, isLeft: isLeft });
+}
 
-  // ball
-  noStroke(); fill(200, 30, 30);
-  ellipse(cBall.x, cBall.y, cBall.r * 2);
-  stroke(255, 180, 180); strokeWeight(1); noFill();
-  arc(cBall.x, cBall.y, cBall.r * 1.2, cBall.r * 1.6, -PI / 2, PI / 2);
-  arc(cBall.x, cBall.y, cBall.r * 1.2, cBall.r * 1.6, PI / 2, PI * 1.5);
-
-  // score
-  noStroke(); fill(30); textSize(20); textAlign(LEFT, TOP);
-  text("Score: " + cScore, 12, 12);
-
-  fill(150); textSize(11); textAlign(CENTER, BOTTOM);
-  text("Click when ball enters green zone  |  M = menu", W / 2, H - 8);
-
-  if (cOver) {
-    fill(0, 0, 0, 150); noStroke(); rect(0, 0, W, H);
-    fill(255); textSize(48); textAlign(CENTER, CENTER);
-    text("OUT!", W / 2, H / 2 - 50);
-    textSize(22); text("Score: " + cScore, W / 2, H / 2 + 8);
-    fill(200); textSize(14); text("Click to restart", W / 2, H / 2 + 52);
+function r_spawnExplosion(x, y) {
+  for (let i = 0; i < 20; i++) { 
+    r_particles.push({ 
+      x: x, y: y, 
+      vx: random(-8, 8), vy: random(-8, 8), 
+      life: 1, decay: 0.03, size: random(8, 20), 
+      color: random() > 0.5 ? [255, 100, 0] : [255, 200, 0] 
+    }); 
   }
 }
 
-// =============================================
-//  AUTO RUSH GAME STATE
-// =============================================
-const LANES = [100, 200, 300];
-let aCar, aObs, aLives, aScore, aOver, aSpeed, aSpawnTimer;
-
-function autoReset() {
-  aCar = { lane: 1, y: H - 80, w: 36, h: 60, switching: false, targetX: LANES[1], x: LANES[1] };
-  aObs = [];
-  aLives = 3;
-  aScore = 0;
-  aOver = false;
-  aSpeed = 3;
-  aSpawnTimer = 0;
+function r_drawAuto(x, y) {
+  push(); 
+  translate(x, y);
+  
+  // Front tyre
+  fill(20); rect(-4, -26, 8, 12, 2);
+  // Back tyres
+  rect(-16, 12, 6, 14, 2); rect(10, 12, 6, 14, 2);
+  
+  // Green body base
+  fill(30, 150, 50);
+  beginShape(); 
+  vertex(-12, -18); 
+  vertex(12, -18); 
+  vertex(16, 26); 
+  vertex(-16, 26); 
+  endShape(CLOSE);
+  
+  // Yellow canvas roof
+  fill(255, 200, 0);
+  rect(-14, -5, 28, 30, 6);
+  
+  // Windshield & Front Cabin
+  fill(40, 50, 60);
+  rect(-10, -16, 20, 10, 2);
+  
+  // Headlight
+  fill(255, 255, 200); 
+  ellipse(0, -20, 8, 8);
+  
+  // Glow beam when accelerating
+  if (mouseIsPressed || touches.length > 0) {
+    fill(255, 255, 100, 80);
+    beginShape(); 
+    vertex(-4, -22); 
+    vertex(4, -22); 
+    vertex(25, -65); 
+    vertex(-25, -65); 
+    endShape(CLOSE);
+  }
+  pop();
 }
 
-function autoUpdate() {
-  if (aOver) return;
-  aScore += 1 / 60;
-  aSpeed = 3 + aScore * 0.04;
+function r_drawCar(x, y, col, isObstacle) {
+  push(); translate(x, y); if (isObstacle) rotate(PI); 
+  
+  fill(20); 
+  rect(-18, -20, 6, 12, 2); rect(12, -20, 6, 12, 2); 
+  rect(-18, 10, 6, 12, 2); rect(12, 10, 6, 12, 2); 
+  
+  fill(col); 
+  rect(-16, -32, 32, 64, 8);
+  
+  fill(30, 40, 50); 
+  rect(-12, -15, 24, 18, 3); rect(-12, 15, 24, 10, 3); 
+  
+  fill(max(col[0]-30,0), max(col[1]-30,0), max(col[2]-30,0)); 
+  rect(-14, -5, 28, 25, 4);
+  
+  fill(255, 240, 180); 
+  rect(-14, -31, 6, 4, 2); rect(8, -31, 6, 4, 2); 
+  
+  fill(255, 0, 0); 
+  rect(-14, 28, 8, 4, 2); rect(6, 28, 8, 4, 2); 
+  
+  pop();
+}
 
-  // Smooth lane switch
-  aCar.x = lerp(aCar.x, LANES[aCar.lane], 0.18);
+function r_drawTruck(x, y, col) { 
+  push(); translate(x, y); rotate(PI); 
+  fill(col); rect(-22, -15, 44, 75, 4); 
+  fill(200); rect(-18, -40, 36, 25, 6); 
+  fill(30); rect(-14, -35, 28, 10, 2); 
+  pop(); 
+}
 
-  // Spawn obstacles
-  aSpawnTimer++;
-  if (aSpawnTimer > max(45, 90 - aScore * 0.5)) {
-    let lane = floor(random(3));
-    aObs.push({ x: LANES[lane], y: -40, w: 36, h: 56, lane });
-    aSpawnTimer = 0;
+function r_drawCow(x, y) { 
+  push(); translate(x, y); 
+  fill(240); rect(-10, -15, 20, 30, 8); 
+  fill(30); ellipse(-3, -5, 8, 10); ellipse(4, 8, 10, 8); 
+  fill(240); ellipse(0, 15, 14, 18); 
+  fill(200, 150, 150); ellipse(0, 22, 10, 6); 
+  fill(180); triangle(-6, 12, -12, 6, -4, 8); triangle(6, 12, 12, 6, 4, 8); 
+  pop(); 
+}
+
+function r_drawTree(x, y) { 
+  fill(90, 60, 40); rect(x - 5, y, 10, 30); 
+  fill(40, 130, 50); 
+  ellipse(x, y - 10, 60, 60); 
+  ellipse(x - 15, y + 5, 50, 50); 
+  ellipse(x + 15, y + 5, 50, 50); 
+}
+
+function r_drawShop(x, y, isLeft) { 
+  push(); translate(x, y); 
+  fill(200, 180, 150); 
+  rect(isLeft ? -20 : -40, -20, 60, 40); 
+  for(let i = 0; i < 6; i++) { 
+    fill(i%2==0 ? color(200,40,40) : color(240)); 
+    rect((isLeft ? -20 : -40) + i*10, -30, 10, 20); 
+  } 
+  fill(0); textSize(12); textAlign(CENTER); 
+  text(random() > 0.5 ? "CHAI" : "DHABA", isLeft ? 10 : -10, -5); 
+  pop(); 
+}
+
+function drawAutoRushGame() {
+  push();
+  if (r_shakeTimer > 0) { 
+    translate(random(-8, 8), random(-8, 8)); 
+    r_shakeTimer--; 
+  }
+  
+  background(85, 170, 75); 
+  fill(50, 50, 55); noStroke(); 
+  rect(r_cx - r_roadWidth/2, 0, r_roadWidth, r_H); 
+  
+  fill(240, 200, 50); 
+  rect(r_cx - r_roadWidth/2 + 5, 0, 5, r_H); 
+  rect(r_cx + r_roadWidth/2 - 10, 0, 5, r_H);
+  
+  stroke(255, 255, 255, 180); 
+  strokeWeight(4); 
+  drawingContext.setLineDash([30, 40]);
+  
+  let laneDiv1 = r_cx - r_roadWidth * 0.16; 
+  let laneDiv2 = r_cx + r_roadWidth * 0.16;
+  
+  line(laneDiv1, (r_roadOffset % 70) - 70, laneDiv1, r_H); 
+  line(laneDiv2, (r_roadOffset % 70) - 70, laneDiv2, r_H);
+  
+  drawingContext.setLineDash([]); noStroke();
+
+  for (let s of r_scenery) { 
+    if (s.type === 'TREE') r_drawTree(s.x, s.y); 
+    if (s.type === 'SHOP') r_drawShop(s.x, s.y, s.isLeft); 
   }
 
-  // Move obstacles
-  for (let o of aObs) o.y += aSpeed;
+  if (r_state === 'START') {
+    r_drawAuto(r_player.x, r_player.y);
+    fill(0, 180); rect(0, 0, r_W, r_H); fill(255); textAlign(CENTER, CENTER);
+    textSize(min(r_W * 0.1, 50)); fill(255, 200, 50); 
+    text("RICKSHAW RUSH", r_cx, r_H * 0.3);
+    textSize(20); fill(255); 
+    text("DRAG LEFT/RIGHT to Steer\nHOLD SCREEN to Accelerate\nAVOID Traffic & Cows!", r_cx, r_H * 0.55);
+    textSize(24); fill(100, 255, 100); 
+    text("Tap to Start Racing", r_cx, r_H * 0.8);
+  } 
+  else if (r_state === 'PLAY' || r_state === 'OVER') {
+    
+    if (r_state === 'PLAY') {
+      let isPressing = mouseIsPressed || touches.length > 0;
+      let ignoringSteer = (mouseX > 10 && mouseX < 110 && mouseY > 10 && mouseY < 50); 
 
-  // Collision check
-  for (let i = aObs.length - 1; i >= 0; i--) {
-    let o = aObs[i];
-    if (
-      abs(o.x - aCar.x) < 30 &&
-      abs(o.y - aCar.y) < 50
-    ) {
-      aLives--;
-      aObs.splice(i, 1);
-      if (aLives <= 0) aOver = true;
-    } else if (o.y > H + 60) {
-      aObs.splice(i, 1);
+      if (isPressing && !ignoringSteer) { 
+        r_player.speed = lerp(r_player.speed, r_player.maxSpeed * r_speedMult, 0.05); 
+        if (frameCount % 4 === 0) {
+          r_particles.push({
+            x: r_player.x + random(-10, 10), y: r_player.y + 35, 
+            vx: random(-0.5, 0.5), vy: random(1, 3), 
+            life: 1, decay: 0.05, size: random(10, 20), color: [150, 150, 150]
+          });
+        } 
+      } else { 
+        r_player.speed = lerp(r_player.speed, r_player.minSpeed * r_speedMult, 0.03); 
+      }
+      
+      r_score += r_player.speed * 0.02; 
+      r_speedMult = 1 + (r_score / 1500);
+      
+      // Update High score
+      if (floor(r_score) > highScores.rush) {
+        highScores.rush = floor(r_score);
+        saveHighScores();
+      }
+
+      if (isPressing && !ignoringSteer) { 
+        r_player.x = lerp(r_player.x, constrain(mouseX, r_cx - r_roadWidth/2 + 25, r_cx + r_roadWidth/2 - 25), 0.1); 
+      }
+      
+      if (r_player.invulnTimer > 0) r_player.invulnTimer--;
+      r_roadOffset += r_player.speed;
+      
+      if (frameCount % max(22, floor(65 / r_speedMult)) === 0) r_spawnObstacle();
+      if (frameCount % 15 === 0) r_spawnScenery(-50);
+      
+      for (let s of r_scenery) s.y += r_player.speed; 
+      r_scenery = r_scenery.filter(s => s.y < r_H + 100);
+
+      for (let i = r_obstacles.length - 1; i >= 0; i--) {
+        let obs = r_obstacles[i]; 
+        obs.y += (r_player.speed - obs.speed); 
+        
+        if (!obs.passed && obs.y > r_player.y) { 
+          obs.passed = true; 
+          if (dist(r_player.x, r_player.y, obs.x, obs.y) < 70) { 
+            r_score += 20; 
+            r_particles.push({x: r_player.x, y: r_player.y - 50, vx: 0, vy: -1.5, life: 1, decay: 0.02, text: "+20 Near Miss!"}); 
+          } 
+        }
+        
+        let margin = 2; 
+        if (r_player.invulnTimer === 0 && (r_player.x - r_player.w/2 + margin < obs.x + obs.w/2 - margin && r_player.x + r_player.w/2 - margin > obs.x - obs.w/2 + margin && r_player.y - r_player.h/2 + margin < obs.y + obs.h/2 - margin && r_player.y + r_player.h/2 - margin > obs.y - obs.h/2 + margin)) {
+          r_lives--; 
+          r_shakeTimer = 20; 
+          r_player.invulnTimer = 60; 
+          r_spawnExplosion(r_player.x, r_player.y - 20); 
+          r_player.speed *= 0.3; 
+          if (r_lives <= 0) r_state = 'OVER';
+        }
+        if (obs.y > r_H + 100) r_obstacles.splice(i, 1);
+      }
+      
+      for (let p of r_particles) { 
+        p.x += p.vx; p.y += p.vy; p.life -= p.decay; 
+      } 
+      r_particles = r_particles.filter(p => p.life > 0);
+    }
+    
+    for (let obs of r_obstacles) { 
+      if (obs.type === 'CAR') r_drawCar(obs.x, obs.y, obs.color, true); 
+      if (obs.type === 'TRUCK') r_drawTruck(obs.x, obs.y, obs.color); 
+      if (obs.type === 'COW') r_drawCow(obs.x, obs.y); 
+    }
+    
+    if (r_player.invulnTimer % 10 < 5) r_drawAuto(r_player.x, r_player.y);
+
+    for (let p of r_particles) { 
+      if (p.text) { 
+        fill(255, 255, 50, p.life * 255); textSize(18); textAlign(CENTER); text(p.text, p.x, p.y); 
+      } else { 
+        fill(p.color[0], p.color[1], p.color[2], p.life * 255); ellipse(p.x, p.y, p.size * p.life); 
+      } 
+    }
+
+    fill(0, 150); rect(0, 0, r_W, 60); 
+    fill(255); textSize(24); 
+    
+    textAlign(CENTER, CENTER); 
+    text(floor(r_score) + " M   |   High: " + highScores.rush, r_W / 2, 30); 
+    
+    textAlign(LEFT, CENTER); text("LIVES: ", 20, 30); 
+    for (let i = 0; i < r_lives; i++) { 
+      fill(255, 50, 50); ellipse(110 + (i * 25), 30, 15, 15); 
+    }
+    
+    if (r_state === 'OVER') { 
+      fill(0, 200); rect(0, 0, r_W, r_H); 
+      fill(255, 50, 50); textAlign(CENTER, CENTER); 
+      textSize(min(r_W * 0.12, 60)); text("CRASHED!", r_cx, r_H * 0.35); 
+      fill(255); textSize(26); text("Final Distance: " + floor(r_score) + " M", r_cx, r_H * 0.48); 
+      textSize(24); fill(100, 255, 100); text("Tap to Restart", r_cx, r_H * 0.7); 
     }
   }
-}
-
-function autoDraw() {
-  background(30, 30, 30);
-  autoUpdate();
-
-  // Road
-  stroke(60); strokeWeight(2);
-  for (let lx of LANES) line(lx, 0, lx, H);
-  // Lane dividers
-  stroke(80); strokeWeight(1);
-  line(LANES[0] + 50, 0, LANES[0] + 50, H);
-  line(LANES[1] + 50, 0, LANES[1] + 50, H);
-
-  // Obstacles (red cars)
-  for (let o of aObs) {
-    fill(220, 50, 50); noStroke();
-    rect(o.x - o.w / 2, o.y - o.h / 2, o.w, o.h, 5);
-    fill(180, 30, 30);
-    rect(o.x - o.w / 2 + 4, o.y - o.h / 2 + 6, o.w - 8, 12, 3);
-    rect(o.x - o.w / 2 + 4, o.y + o.h / 2 - 18, o.w - 8, 12, 3);
-  }
-
-  // Player car (blue)
-  fill(60, 130, 255); noStroke();
-  rect(aCar.x - aCar.w / 2, aCar.y - aCar.h / 2, aCar.w, aCar.h, 6);
-  fill(30, 90, 200);
-  rect(aCar.x - aCar.w / 2 + 4, aCar.y - aCar.h / 2 + 8, aCar.w - 8, 12, 3);
-  rect(aCar.x - aCar.w / 2 + 4, aCar.y + aCar.h / 2 - 20, aCar.w - 8, 12, 3);
-  // Headlights
-  fill(255, 255, 180); noStroke();
-  ellipse(aCar.x - 10, aCar.y - aCar.h / 2 + 4, 8, 5);
-  ellipse(aCar.x + 10, aCar.y - aCar.h / 2 + 4, 8, 5);
-
-  // HUD
-  noStroke(); fill(255); textSize(16); textAlign(LEFT, TOP);
-  text("Score: " + floor(aScore), 12, 12);
-  textAlign(RIGHT, TOP);
-  text("Lives: " + aLives, W - 12, 12);
-  backHint();
-
-  // Lives icons
-  fill(255, 80, 80); noStroke();
-  for (let i = 0; i < aLives; i++) {
-    ellipse(W - 30 - i * 20, 38, 12, 12);
-  }
-
-  if (aOver) {
-    fill(0, 0, 0, 160); noStroke(); rect(0, 0, W, H);
-    fill(255, 80, 80); textSize(38); textAlign(CENTER, CENTER);
-    text("Game Over", W / 2, H / 2 - 40);
-    fill(255); textSize(20);
-    text("Score: " + floor(aScore), W / 2, H / 2 + 10);
-    fill(180); textSize(13);
-    text("Click to restart", W / 2, H / 2 + 50);
-  }
-}
-
-// =============================================
-//  MENU
-// =============================================
-function menuDraw() {
-  background(18, 18, 38);
-
-  fill(255, 220, 80); textSize(32); textAlign(CENTER, CENTER); noStroke();
-  text("🎮 Mini Games", W / 2, 120);
-
-  let options = [
-    { key: "1", label: "Kite Game",    color: [255, 80, 120] },
-    { key: "2", label: "Cricket Game", color: [80, 200, 120] },
-    { key: "3", label: "Auto Rush",    color: [80, 150, 255] },
-  ];
-
-  for (let i = 0; i < options.length; i++) {
-    let o = options[i];
-    let by = 240 + i * 90;
-    fill(o.color[0], o.color[1], o.color[2], 40); noStroke();
-    rect(80, by - 28, 240, 56, 12);
-    stroke(o.color[0], o.color[1], o.color[2]); strokeWeight(1.5);
-    rect(80, by - 28, 240, 56, 12);
-    fill(o.color[0], o.color[1], o.color[2]); noStroke();
-    textSize(11); textAlign(LEFT, CENTER);
-    text("Press", 96, by);
-    fill(255); textSize(22); textAlign(LEFT, CENTER);
-    text(o.key, 130, by);
-    textSize(18); textAlign(LEFT, CENTER);
-    text(o.label, 156, by);
-  }
-
-  fill(120); textSize(11); textAlign(CENTER, BOTTOM);
-  text("Press 1, 2 or 3 to start", W / 2, H - 20);
-}
-
-// =============================================
-//  p5 LIFECYCLE
-// =============================================
-function setup() {
-  createCanvas(W, H);
-  textFont('monospace');
-  kiteReset();
-  cricketReset();
-  autoReset();
-}
-
-function draw() {
-  if      (scene === 'menu')    menuDraw();
-  else if (scene === 'kite')    kiteDraw();
-  else if (scene === 'cricket') cricketDraw();
-  else if (scene === 'auto')    autoDraw();
-}
-
-function mousePressed() {
-  if (scene === 'kite') {
-    if (kOver) { kiteReset(); return; }
-    kite.vy -= 5.5;
-    kite.vy = max(kite.vy, -7);
-  }
-
-  if (scene === 'cricket') {
-    if (cOver) { cricketReset(); return; }
-    let hitLeft = cBat.x - 45, hitTop = cBat.y - cBat.len / 2, hitBot = cBat.y + cBat.len / 2;
-    if (cState === 'incoming' && cBall.x >= hitLeft && cBall.x <= cBat.x + 10 && cBall.y >= hitTop && cBall.y <= hitBot) {
-      cScore++;
-      cState = 'hit';
-      cBall.vx = random(3, 6);
-      cBall.vy = random(-9, -6);
-    }
-  }
-
-  if (scene === 'auto') {
-    if (aOver) { autoReset(); return; }
-    aCar.lane = (aCar.lane + 1) % 3;
-  }
-}
-
-function keyPressed() {
-  if (key === 'm' || key === 'M') {
-    scene = 'menu';
-    kiteReset(); cricketReset(); autoReset();
-    return;
-  }
-  if (scene === 'menu') {
-    if (key === '1') { kiteReset();    scene = 'kite'; }
-    if (key === '2') { cricketReset(); scene = 'cricket'; }
-    if (key === '3') { autoReset();    scene = 'auto'; }
-  }
+  pop();
 }
