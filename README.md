@@ -1,47 +1,40 @@
-# HexNova_cc2026-
-## 📌 Project Description
-This project is a collection of simple one-button interactive games inspired by Indian themes.  
-Each game focuses on easy controls with creative gameplay.
+# HexNova_cc2026
 
----
-## 🎮 Games Included
+## Project Overview
+This project is a collection of simple interactive mini-games built using p5.js.  
+The focus is on one-button gameplay with easy controls but engaging mechanics.
 
-### 🪁 Kite Drift Control
-- Tap = Move Up
-- No Tap = Fall Down
-- Wind affects movement (left-right drift)
-- Goal: Stay in air and score maximum
+## Games Included
 
----
+### Kite Drift Control
+A kite control game where the player manages height and movement.
 
-### 🚕 Auto Rush
-- Tap = Speed Up / Move
-- Avoid obstacles like cars, trucks, cows
-- Speed increases with score
-- 3 Lives system
+- Click to move up  
+- No input causes the kite to fall  
+- Wind affects left-right movement  
+- Goal is to survive and score as long as possible  
 
----
+### Auto Rush
+A lane-based obstacle avoidance game.
 
-## ✏️ Ideation & Sketches
-We created hand-drawn concept sketches before starting development.  
-These sketches helped us plan gameplay, controls, and structure.
+- Click to switch lanes  
+- Avoid incoming obstacles  
+- Speed increases gradually  
+- Player has 3 lives  
 
----
+## Ideation
+We created hand-drawn sketches before development to plan gameplay and structure.
 
-## 💻 Tech Stack
-- p5.js
-- HTML
-- JavaScript
+## Tech Stack
+- p5.js  
+- HTML  
+- JavaScript  
 
----
+## Team
+Rabit Mansuri — Design and UI  
+Rudraksh Nagar — Game Logic  
 
-## 👥 Team
-- Rabit → Design & UI
-- Rudraksh → Game Logic
-
----
-
-## 🚀 Current Progress
-- ✅ Idea finalized
-- ✅ Sketches created & uploaded
-- 🔄 Development in progress
+## Current Progress
+- Ideas finalized  
+- Sketches completed  
+- Development in progress  
