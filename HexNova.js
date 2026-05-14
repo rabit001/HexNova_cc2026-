@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────
-// 🎮 ULTIMATE DESI GAMING ARCADE 
-// (Proper Format + High Scores + Wickets + Runs Logic)
+// 🎮 HEXNOVA ARCADE 
+// (Premium Menu + High Scores + Indian Theme + Potholes + Kite Song)
 // ─────────────────────────────────────────────────────────
 
 let arcadeState = 'MENU'; 
@@ -14,9 +14,8 @@ let highScores = {
   rush: 0
 };
 
-// Try to load saved high scores
 try {
-  let saved = localStorage.getItem('desiArcadeHighScores');
+  let saved = localStorage.getItem('hexNovaHighScores');
   if (saved) {
     highScores = JSON.parse(saved);
   }
@@ -26,7 +25,7 @@ try {
 
 function saveHighScores() {
   try {
-    localStorage.setItem('desiArcadeHighScores', JSON.stringify(highScores));
+    localStorage.setItem('hexNovaHighScores', JSON.stringify(highScores));
   } catch (e) { }
 }
 
@@ -35,13 +34,14 @@ function saveHighScores() {
 // ==========================================
 let k_W, k_H = 600, k_scaleF, k_wRatio, k_GROUND_Y = 510;
 let k_player, k_enemies, k_score, k_gameOver, k_particles, k_flashTimer;
+let kiteSong; // Added variable for the kite song
 
 // ==========================================
 // 2. CRICKET SIXER VARIABLES
 // ==========================================
 let c_state = 'START'; 
 let c_score = 0;
-let c_lastRuns = 0; // Tracks if you hit 1, 2, 4, 6 etc.
+let c_lastRuns = 0; 
 let c_cx, c_H, c_W, c_pitchTop, c_pitchBottom, c_batsmanY, c_hitZoneStart, c_hitZoneEnd;
 let c_ballY = 0, c_ballSpeed = 5, c_ballFlyY = 0, c_ballFlyX = 0, c_ballScale = 10;
 let c_batAngle = 0, c_swingFrames = 0;
@@ -53,9 +53,20 @@ let soundInitialized = false;
 // ==========================================
 let r_W, r_H, r_cx, r_roadWidth;
 let r_state = 'START', r_score = 0, r_lives = 3, r_speedMult = 1;
-let r_player = { x: 0, y: 0, speed: 0, maxSpeed: 20, minSpeed: 4, w: 32, h: 54, invulnTimer: 0 };
+// Added scaleFactor for pothole falling effect
+let r_player = { x: 0, y: 0, speed: 0, maxSpeed: 20, minSpeed: 4, w: 32, h: 54, invulnTimer: 0, scaleFactor: 1 };
 let r_roadOffset = 0, r_obstacles = [], r_scenery = [], r_particles = [], r_shakeTimer = 0;
 
+// ─── PRELOAD ──────────────────────────────
+function preload() {
+  soundFormats('mp3', 'mpeg', 'ogg');
+  try {
+    // Load the song you uploaded
+    kiteSong = loadSound('Udi Udi Jaaye.mpeg'); 
+  } catch (e) {
+    console.log("Kite song not loaded.");
+  }
+}
 
 // ─── SETUP & WINDOW RESIZE ──────────────────────────────
 function setup() {
@@ -63,6 +74,10 @@ function setup() {
   frameRate(60);
   textAlign(CENTER, CENTER);
   updateAllLayouts();
+  
+  if (kiteSong) {
+    kiteSong.setVolume(0.6); // Adjust volume if needed
+  }
 }
 
 function windowResized() {
@@ -71,22 +86,19 @@ function windowResized() {
 }
 
 function updateAllLayouts() {
-  // Kite Layout
   k_scaleF = windowHeight / 600;
   k_W = windowWidth / k_scaleF;
   k_wRatio = k_W / 400;
 
-  // Cricket Layout
   c_W = windowWidth;
   c_H = windowHeight;
   c_cx = c_W / 2;
   c_pitchTop = c_H * 0.25;
   c_pitchBottom = c_H;
   c_batsmanY = c_H * 0.80;
-  c_hitZoneStart = c_H * 0.70; // Slightly larger zone for 1,2,3 runs
+  c_hitZoneStart = c_H * 0.70; 
   c_hitZoneEnd = c_H * 0.85;
 
-  // Auto Rush Layout
   r_W = windowWidth;
   r_H = windowHeight;
   r_cx = r_W / 2;
@@ -124,69 +136,106 @@ function draw() {
   }
 }
 
-// ─── UPGRADED MENU UI ──────────────────────────────────
+// ─── PREMIUM MENU UI ──────────────────────────────────
+let menuAnimTime = 0;
 let menuCards = [];
-function drawMenu() {
-  // Smooth gradient-like background
-  background(15, 20, 30);
-  
-  // Floating Background particles
-  fill(255, 50); 
-  noStroke();
-  ellipse(width * 0.2, (frameCount * 0.5) % height, 4, 4);
-  ellipse(width * 0.5, (frameCount * 1.2) % height, 6, 6);
-  ellipse(width * 0.8, (frameCount * 0.8) % height, 3, 3);
-  ellipse(width * 0.3, (frameCount * 1.5) % height, 5, 5);
-  ellipse(width * 0.7, (frameCount * 0.6) % height, 7, 7);
 
-  // Main Banner
-  fill(255, 204, 0);
-  textSize(min(width * 0.08, 50));
-  text("DESI GAMING ARCADE", width / 2, height * 0.12);
+function drawMenu() {
+  menuAnimTime += 0.05;
+
+  let c1 = color(15, 20, 35);
+  let c2 = color(45, 25, 60);
+  for(let y = 0; y < height; y++){
+    let n = map(y, 0, height, 0, 1);
+    stroke(lerpColor(c1, c2, n));
+    line(0, y, width, y);
+  }
+  noStroke();
+
+  for (let i = 0; i < 25; i++) {
+    let px = (noise(i, frameCount * 0.003) * width * 1.5) - width * 0.25;
+    let py = (noise(i + 100, frameCount * 0.003) * height * 1.5) - height * 0.25;
+    let pSize = noise(i + 200) * 12;
+    fill(255, 255, 255, 20 + sin(frameCount * 0.05 + i) * 30);
+    ellipse(px, py, pSize);
+  }
+
+  let titleY = height * 0.12 + sin(menuAnimTime) * 8;
   
-  fill(180, 200, 220);
+  drawingContext.shadowBlur = 25;
+  drawingContext.shadowColor = color(255, 204, 0);
+  fill(255, 220, 50);
+  textSize(min(width * 0.08, 60));
+  textAlign(CENTER, CENTER);
+  text("HEXNOVA", width / 2, titleY);
+
+  drawingContext.shadowBlur = 0; 
+  fill(180, 220, 255);
   textSize(min(width * 0.035, 18));
-  text("Choose your flavor. Play to beat the High Score!", width / 2, height * 0.18);
+  text("Choose your flavor. Play to beat the High Score!", width / 2, titleY + 55);
 
   let cardW = min(width * 0.85, 420);
   let cardH = min(height * 0.2, 130);
-  let startY = height * 0.28;
+  let startY = height * 0.30;
   let gap = cardH + 25;
 
   menuCards = [
-    { id: 'KITE', title: "🪁 Kite Drift", subtitle: "Cut enemy manja from below!", col: [40, 140, 240], hs: highScores.kite, y: startY },
-    { id: 'CRICKET', title: "🏏 Cricket Sixer", subtitle: "Timing is everything. Hit 1s, 4s & 6s!", col: [60, 180, 100], hs: highScores.cricket, y: startY + gap },
-    { id: 'RUSH', title: "🛺 Rickshaw Rush", subtitle: "Endless traffic dodge. Survive!", col: [240, 90, 70], hs: highScores.rush, y: startY + gap * 2 }
+    { id: 'KITE', icon: "🪁", title: "Kite Drift", subtitle: "Cut enemy manja from below!", col: [40, 140, 240], hs: highScores.kite, y: startY },
+    { id: 'CRICKET', icon: "🏏", title: "Cricket Sixer", subtitle: "Hit Chakka & Chauka with perfect timing!", col: [60, 200, 100], hs: highScores.cricket, y: startY + gap },
+    { id: 'RUSH', icon: "🛺", title: "Rickshaw Rush", subtitle: "Dodge traffic & Indian potholes!", col: [255, 90, 70], hs: highScores.rush, y: startY + gap * 2 }
   ];
 
-  for (let card of menuCards) {
+  for (let i = 0; i < menuCards.length; i++) {
+    let card = menuCards[i];
     let isHover = mouseX > width/2 - cardW/2 && mouseX < width/2 + cardW/2 && mouseY > card.y && mouseY < card.y + cardH;
-    
-    // Card Shadow
-    fill(0, 0, 0, 80);
-    rect(width / 2 - cardW / 2 + 4, card.y + 4, cardW, cardH, 15);
 
-    // Card Body
-    fill(isHover ? color(card.col[0] + 20, card.col[1] + 20, card.col[2] + 20) : card.col);
-    rect(width / 2 - cardW / 2, card.y, cardW, cardH, 15);
+    push();
+    translate(width / 2, card.y + cardH / 2);
     
-    // Text styling
+    if (isHover) {
+      scale(1.05); 
+    }
+
+    drawingContext.shadowBlur = isHover ? 30 : 15;
+    drawingContext.shadowColor = color(card.col[0], card.col[1], card.col[2], isHover ? 200 : 80);
+    
+    fill(20, 25, 35, 220); 
+    strokeWeight(2);
+    stroke(isHover ? color(card.col[0], card.col[1], card.col[2]) : color(card.col[0], card.col[1], card.col[2], 100));
+    rect(-cardW / 2, -cardH / 2, cardW, cardH, 18);
+    
+    noStroke();
+    drawingContext.shadowBlur = 0; 
+
+    fill(card.col[0], card.col[1], card.col[2]);
+    rect(-cardW / 2, -cardH / 2, 12, cardH, 18, 0, 0, 18);
+
+    textSize(min(width * 0.1, 55));
+    textAlign(CENTER, CENTER);
+    text(card.icon, -cardW / 2 + 55, 0);
+
     textAlign(LEFT, CENTER);
-    fill(255); 
-    textSize(min(width * 0.06, 28)); 
-    text(card.title, width / 2 - cardW / 2 + 20, card.y + cardH * 0.35);
+    fill(255);
+    textSize(min(width * 0.06, 26));
+    text(card.title, -cardW / 2 + 100, -15);
     
-    fill(255, 255, 255, 200); 
-    textSize(min(width * 0.035, 15)); 
-    text(card.subtitle, width / 2 - cardW / 2 + 20, card.y + cardH * 0.65);
+    fill(180, 190, 200);
+    textSize(min(width * 0.035, 14));
+    text(card.subtitle, -cardW / 2 + 100, 20);
 
-    // High Score Badge
-    textAlign(RIGHT, CENTER);
-    fill(255, 255, 100);
-    textSize(min(width * 0.04, 16));
-    text("Best: " + card.hs, width / 2 + cardW / 2 - 20, card.y + cardH * 0.5);
+    fill(10, 15, 25);
+    stroke(card.col[0], card.col[1], card.col[2], 150);
+    strokeWeight(1);
+    let badgeW = 90;
+    rect(cardW / 2 - badgeW - 15, -cardH / 2 + 15, badgeW, 28, 14);
+    noStroke();
+    fill(255, 220, 100);
+    textSize(12);
+    textAlign(CENTER, CENTER);
+    text("Best: " + card.hs, cardW / 2 - 15 - badgeW/2, -cardH / 2 + 29);
+
+    pop();
   }
-  textAlign(CENTER, CENTER); // Reset for other games
 }
 
 function drawBackButton() {
@@ -206,10 +255,13 @@ function drawBackButton() {
 function mousePressed() {
   if (!soundInitialized) initSound();
 
-  // Check Back Button
   if (arcadeState !== 'MENU') {
     if (mouseX > 10 && mouseX < 110 && mouseY > 10 && mouseY < 50) {
       arcadeState = 'MENU';
+      // Stop the kite song when going back to the menu
+      if (kiteSong && kiteSong.isPlaying()) {
+        kiteSong.pause();
+      }
       return; 
     }
   }
@@ -220,7 +272,13 @@ function mousePressed() {
     for (let card of menuCards) {
       if (mouseX > width/2 - cardW/2 && mouseX < width/2 + cardW/2 && mouseY > card.y && mouseY < card.y + cardH) {
         arcadeState = card.id;
-        if (card.id === 'KITE') { k_resetGame(); }
+        if (card.id === 'KITE') { 
+          k_resetGame(); 
+          // Play song when kite game starts
+          if (kiteSong && !kiteSong.isPlaying()) {
+             kiteSong.loop();
+          }
+        }
         if (card.id === 'CRICKET') { c_enterGame(); }
         if (card.id === 'RUSH') { r_resetGame(); r_state = 'START'; }
         break;
@@ -244,15 +302,13 @@ function mousePressed() {
     if (c_state === 'PLAY') {
       c_swingFrames = 12; 
       
-      // Timing Check for Runs
       if (c_ballY > c_hitZoneStart && c_ballY < c_hitZoneEnd) {
         c_state = 'HIT';
         
-        // Calculate accuracy based on how close to center of zone
         let zoneCenter = (c_hitZoneStart + c_hitZoneEnd) / 2;
         let maxDiff = (c_hitZoneEnd - c_hitZoneStart) / 2;
         let diff = abs(c_ballY - zoneCenter);
-        let accuracy = 1 - (diff / maxDiff); // 0 to 1
+        let accuracy = 1 - (diff / maxDiff); 
         
         if (accuracy > 0.85) c_lastRuns = 6;
         else if (accuracy > 0.65) c_lastRuns = 4;
@@ -262,7 +318,6 @@ function mousePressed() {
 
         c_score += c_lastRuns;
         
-        // Update High Score
         if (c_score > highScores.cricket) {
           highScores.cricket = c_score;
           saveHighScores();
@@ -355,7 +410,6 @@ function k_burst(x, y, col) {
 }
 
 function k_drawScenery() {
-  // Sky Gradient
   for (let i = 0; i <= 30; i++) {
     let t = i / 30; 
     stroke(lerp(100,185,t), lerp(180,225,t), lerp(240,250,t)); 
@@ -364,17 +418,14 @@ function k_drawScenery() {
   }
   noStroke();
   
-  // Sun
   fill(255, 230, 80, 70); ellipse(k_W * 0.82, 62, 72);
   fill(255, 225, 50, 90); ellipse(k_W * 0.82, 62, 54);
   fill(255, 215, 30); ellipse(k_W * 0.82, 62, 42);
 
-  // Clouds
   k_drawCloud(k_W * 0.15, 70, 1.0); 
   k_drawCloud(k_W * 0.50, 50, 0.8); 
   k_drawCloud(k_W * 0.77, 85, 0.7);
 
-  // Birds
   stroke(50, 60, 90); 
   strokeWeight(1.5); 
   noFill();
@@ -389,19 +440,16 @@ function k_drawScenery() {
   }
   noStroke();
 
-  // Distant Hills
   fill(155, 195, 125, 180); 
   ellipse(k_W * 0.15, k_GROUND_Y + 4, k_W * 0.44, 80); 
   ellipse(k_W * 0.55, k_GROUND_Y + 4, k_W * 0.50, 70); 
   ellipse(k_W * 0.88, k_GROUND_Y + 4, k_W * 0.38, 75);
   
-  // Ground
   fill(95, 160, 65); 
   rect(0, k_GROUND_Y, k_W, k_H - k_GROUND_Y); 
   fill(125, 190, 80); 
   rect(0, k_GROUND_Y, k_W, 8);
   
-  // Dirt Path
   fill(190, 162, 105, 210); 
   beginShape(); 
   vertex(k_W * 0.39, k_GROUND_Y); 
@@ -410,7 +458,6 @@ function k_drawScenery() {
   vertex(k_W * 0.24, k_H); 
   endShape(CLOSE);
 
-  // Scenery Objects
   k_drawTree(k_W * 0.05, k_GROUND_Y, 80); 
   k_drawTree(k_W * 0.14, k_GROUND_Y, 65); 
   k_drawTree(k_W * 0.76, k_GROUND_Y, 75); 
@@ -470,21 +517,18 @@ function drawKiteGame() {
   if (!k_gameOver) {
     k_score += 1 / 60;
     
-    // Update High Score
     if (floor(k_score) > highScores.kite) {
       highScores.kite = floor(k_score);
       saveHighScores();
     }
 
-    // --- PLAYER WIND REDUCED HERE ---
     k_player.windTimer++; 
     if (k_player.windTimer > random(60, 120)) { 
-      // Reduced from 1.5 to 0.7 for much better control
       k_player.windTarget = random(-0.7, 0.7) * k_wRatio; 
       k_player.windTimer = 0; 
     }
     
-    k_player.wind = lerp(k_player.wind, k_player.windTarget, 0.02); // Smoother lerp
+    k_player.wind = lerp(k_player.wind, k_player.windTarget, 0.02); 
     k_player.vy += 0.18; 
     k_player.vx += k_player.wind * 0.07; 
     k_player.vx *= 0.97; 
@@ -506,7 +550,6 @@ function drawKiteGame() {
       k_player.vy = 0; 
     }
 
-    // Enemy Loop
     for (let e of k_enemies) {
       if (!e.alive) continue;
       
@@ -601,7 +644,6 @@ function drawKiteGame() {
     k_particles = k_particles.filter(pt => pt.life > 0);
   }
 
-  // Draw Strings
   for (let e of k_enemies) {
     if (e.string.length < 2) continue; 
     noFill(); strokeWeight(0.8); 
@@ -631,14 +673,13 @@ function drawKiteGame() {
   
   k_drawKite(k_player.x, k_player.y, k_player.angle, [220, 50, 20], 22, 32, true);
 
-  // Top UI
   noStroke(); 
   fill(0, 0, 0, 80); 
   rect(k_W / 2 - 120, 8, 240, 28, 14); 
   fill(255, 250, 220); 
   textSize(14); 
   textAlign(CENTER, CENTER); 
-  text("Score: " + floor(k_score) + "   |   High: " + highScores.kite, k_W / 2, 23);
+  text("Score: " + floor(k_score) + "   |   High: " + highScores.kite, k_W / 2, 23);
   
   fill(60, 40, 10, 200); 
   textSize(11); 
@@ -648,7 +689,7 @@ function drawKiteGame() {
   fill(60, 40, 10, 150); 
   textSize(10); 
   textAlign(CENTER, BOTTOM); 
-  text("Go BELOW enemy to cut  •  Don't let them get below you!", k_W / 2, k_H - 6);
+  text("Go BELOW enemy to cut  •  Don't let them get below you!", k_W / 2, k_H - 6);
 
   if (k_gameOver) {
     fill(0, 0, 0, 160); noStroke(); rect(0, 0, k_W, k_H); 
@@ -709,7 +750,7 @@ function k_drawKite(x, y, angleDeg, col, w, h, isPlayer) {
 
 
 // =========================================================================
-// 2. CRICKET SIXER (Wickets & Runs Timing Expanded)
+// 2. CRICKET SIXER (Tricolor Stands, Blue Jersey, Wickets & Runs Timing)
 // =========================================================================
 function c_enterGame() { 
   c_score = 0; 
@@ -733,12 +774,19 @@ function c_nextBall() {
 function c_drawEnvironment() {
   background(60, 160, 60); 
   
-  fill(50, 100, 200); 
+  // Tricolor Indian Stadium
+  fill(255, 153, 51); // Saffron
   arc(c_cx, c_pitchTop - 100, c_W * 1.5, c_H * 0.6, 0, PI); 
-  fill(200); 
+  fill(255, 255, 255); // White
   arc(c_cx, c_pitchTop - 100, c_W * 1.4, c_H * 0.5, 0, PI); 
-  fill(180, 50, 50); 
+  fill(19, 136, 8); // Green
   arc(c_cx, c_pitchTop - 100, c_W * 1.2, c_H * 0.4, 0, PI);
+  
+  // Ashoka Chakra representation in white band
+  stroke(0, 0, 128, 100);
+  noFill();
+  ellipse(c_cx, c_pitchTop - 100 + c_H * 0.23, 40, 40);
+  noStroke();
   
   fill(210, 180, 140); 
   stroke(255); 
@@ -759,7 +807,6 @@ function c_drawEnvironment() {
 
 function c_drawWickets() {
   push();
-  // Place wickets directly behind the batsman on the crease
   translate(c_cx, c_batsmanY + 30); 
   fill(220, 180, 50);
   
@@ -772,7 +819,6 @@ function c_drawWickets() {
   fill(200, 150, 30);
   rect(-12, -47, 10, 3, 2);
   rect(-1, -47, 10, 3, 2);
-  
   pop();
 }
 
@@ -780,8 +826,15 @@ function c_drawBatsman() {
   push(); 
   translate(c_cx, c_batsmanY); 
   
-  fill(255, 204, 0); 
+  // Team India Blue Jersey
+  fill(45, 136, 255); 
   rect(-15, -40, 30, 40, 5); 
+  
+  // INDIA text on Jersey
+  fill(255, 204, 0);
+  textSize(8);
+  textAlign(CENTER, CENTER);
+  text("INDIA", 0, -20);
   
   fill(255); 
   rect(-15, 0, 10, 35); 
@@ -811,10 +864,7 @@ function c_drawBatsman() {
 
 function drawCricketGame() {
   c_drawEnvironment(); 
-  
-  // Draw Wickets BEFORE batsman so they are behind him
   c_drawWickets();
-  
   c_drawBatsman();
 
   if (c_state === 'START') { 
@@ -837,7 +887,6 @@ function drawCricketGame() {
     }
   } 
   else if (c_state === 'HIT') {
-    // Ball flying animation
     c_ballFlyY -= (c_H * 0.02); 
     c_ballFlyX += random(-3, 3); 
     
@@ -846,14 +895,15 @@ function drawCricketGame() {
     ellipse(c_cx + c_ballFlyX, c_ballFlyY, max(flyScale, 2)); 
     noStroke();
     
-    // Display different text based on runs
     if (c_lastRuns === 6) { fill(255, 204, 0); }
     else if (c_lastRuns === 4) { fill(100, 200, 255); }
     else { fill(255); }
     
     stroke(0); strokeWeight(5); textSize(c_H * 0.08); 
-    if (c_lastRuns === 6) text("SIX!", c_cx, c_H * 0.4);
-    else if (c_lastRuns === 4) text("FOUR!", c_cx, c_H * 0.4);
+    
+    // Indian terms for hits
+    if (c_lastRuns === 6) text("CHAKKA (6)!", c_cx, c_H * 0.4);
+    else if (c_lastRuns === 4) text("CHAUKA (4)!", c_cx, c_H * 0.4);
     else text(c_lastRuns + " RUNS", c_cx, c_H * 0.4);
     
     noStroke();
@@ -877,18 +927,15 @@ function drawCricketGame() {
     c_batAngle = lerp(c_batAngle, 0, 0.2); 
   }
 
-  // Draw Hit Zone (Gradient coloring from Red -> Green -> Red)
   if (c_state === 'PLAY') { 
     let zoneW = c_W * 0.3; 
     let zoneHeight = c_hitZoneEnd - c_hitZoneStart;
     
-    // Draw center optimal line (Green)
     stroke(0, 255, 0, 150); 
     strokeWeight(3);
     let centerZone = c_hitZoneStart + (zoneHeight / 2);
     line(c_cx - zoneW, centerZone, c_cx + zoneW, centerZone);
     
-    // Draw outer limits (Red)
     stroke(255, 50, 50, 150); 
     strokeWeight(1); 
     line(c_cx - zoneW, c_hitZoneStart, c_cx + zoneW, c_hitZoneStart); 
@@ -896,17 +943,16 @@ function drawCricketGame() {
     noStroke(); 
   }
 
-  // Top Bar HUD
   fill(0, 180); rect(0, 0, c_W, 60); 
   fill(255); textSize(24); 
   textAlign(LEFT, CENTER); text("SCORE: " + c_score, 20, 30);
   textAlign(RIGHT, CENTER); text("HIGH SCORE: " + highScores.cricket, c_W - 20, 30);
-  textAlign(CENTER, CENTER); // Reset
+  textAlign(CENTER, CENTER); 
 }
 
 
 // =========================================================================
-// 3. AUTO RUSH (Fully Expanded Rickshaw & Code)
+// 3. AUTO RUSH (Fully Expanded Rickshaw & Pothole Logic)
 // =========================================================================
 function r_resetGame() {
   r_score = 0; 
@@ -914,6 +960,7 @@ function r_resetGame() {
   r_speedMult = 1;
   r_player.x = r_cx; 
   r_player.speed = r_player.minSpeed;
+  r_player.scaleFactor = 1; // Resets pothole shrink effect
   r_obstacles = []; 
   r_scenery = []; 
   r_particles = []; 
@@ -929,7 +976,8 @@ function r_spawnObstacle() {
   let obsX = laneBase + random(-40, 40); 
 
   let typeNum = random(); 
-  let type = typeNum > 0.85 ? 'COW' : (typeNum > 0.6 ? 'TRUCK' : 'CAR');
+  // Potholes have high spawn chance to make it challenging
+  let type = typeNum > 0.85 ? 'POTHOLE' : (typeNum > 0.7 ? 'COW' : (typeNum > 0.45 ? 'TRUCK' : 'CAR'));
   
   let speed = 0; 
   let w = 34, h = 64;
@@ -945,7 +993,11 @@ function r_spawnObstacle() {
     speed = 0; 
     w = 25; 
     h = 35; 
-  } 
+  } else if (type === 'POTHOLE') {
+    speed = 0;
+    w = 45;
+    h = 35;
+  }
   
   r_obstacles.push({ 
     x: obsX, y: -100, w: w, h: h, speed: speed, type: type, 
@@ -972,44 +1024,47 @@ function r_spawnExplosion(x, y) {
   }
 }
 
+// Draw Pothole (Khadde)
+function r_drawPothole(x, y, w, h) {
+  push();
+  translate(x, y);
+  fill(20, 20, 22); // Dark outer edge
+  ellipse(0, 0, w, h);
+  fill(10, 10, 12); // Deep inner core
+  ellipse(-w * 0.1, 0, w * 0.7, h * 0.6);
+  pop();
+}
+
 function r_drawAuto(x, y) {
   push(); 
   translate(x, y);
   
-  // Front tyre
+  // Scale dynamically for pothole falling effect
+  scale(r_player.scaleFactor || 1);
+  
   fill(20); rect(-4, -26, 8, 12, 2);
-  // Back tyres
   rect(-16, 12, 6, 14, 2); rect(10, 12, 6, 14, 2);
   
-  // Green body base
   fill(30, 150, 50);
   beginShape(); 
-  vertex(-12, -18); 
-  vertex(12, -18); 
-  vertex(16, 26); 
-  vertex(-16, 26); 
+  vertex(-12, -18); vertex(12, -18); 
+  vertex(16, 26); vertex(-16, 26); 
   endShape(CLOSE);
   
-  // Yellow canvas roof
   fill(255, 200, 0);
   rect(-14, -5, 28, 30, 6);
   
-  // Windshield & Front Cabin
   fill(40, 50, 60);
   rect(-10, -16, 20, 10, 2);
   
-  // Headlight
   fill(255, 255, 200); 
   ellipse(0, -20, 8, 8);
   
-  // Glow beam when accelerating
   if (mouseIsPressed || touches.length > 0) {
     fill(255, 255, 100, 80);
     beginShape(); 
-    vertex(-4, -22); 
-    vertex(4, -22); 
-    vertex(25, -65); 
-    vertex(-25, -65); 
+    vertex(-4, -22); vertex(4, -22); 
+    vertex(25, -65); vertex(-25, -65); 
     endShape(CLOSE);
   }
   pop();
@@ -1017,26 +1072,13 @@ function r_drawAuto(x, y) {
 
 function r_drawCar(x, y, col, isObstacle) {
   push(); translate(x, y); if (isObstacle) rotate(PI); 
-  
-  fill(20); 
-  rect(-18, -20, 6, 12, 2); rect(12, -20, 6, 12, 2); 
+  fill(20); rect(-18, -20, 6, 12, 2); rect(12, -20, 6, 12, 2); 
   rect(-18, 10, 6, 12, 2); rect(12, 10, 6, 12, 2); 
-  
-  fill(col); 
-  rect(-16, -32, 32, 64, 8);
-  
-  fill(30, 40, 50); 
-  rect(-12, -15, 24, 18, 3); rect(-12, 15, 24, 10, 3); 
-  
-  fill(max(col[0]-30,0), max(col[1]-30,0), max(col[2]-30,0)); 
-  rect(-14, -5, 28, 25, 4);
-  
-  fill(255, 240, 180); 
-  rect(-14, -31, 6, 4, 2); rect(8, -31, 6, 4, 2); 
-  
-  fill(255, 0, 0); 
-  rect(-14, 28, 8, 4, 2); rect(6, 28, 8, 4, 2); 
-  
+  fill(col); rect(-16, -32, 32, 64, 8);
+  fill(30, 40, 50); rect(-12, -15, 24, 18, 3); rect(-12, 15, 24, 10, 3); 
+  fill(max(col[0]-30,0), max(col[1]-30,0), max(col[2]-30,0)); rect(-14, -5, 28, 25, 4);
+  fill(255, 240, 180); rect(-14, -31, 6, 4, 2); rect(8, -31, 6, 4, 2); 
+  fill(255, 0, 0); rect(-14, 28, 8, 4, 2); rect(6, 28, 8, 4, 2); 
   pop();
 }
 
@@ -1045,6 +1087,12 @@ function r_drawTruck(x, y, col) {
   fill(col); rect(-22, -15, 44, 75, 4); 
   fill(200); rect(-18, -40, 36, 25, 6); 
   fill(30); rect(-14, -35, 28, 10, 2); 
+  
+  // Desi Style Horn OK Please
+  fill(255, 255, 0); 
+  textSize(8); 
+  textAlign(CENTER, CENTER); 
+  text("HORN\nOK", 0, 10);
   pop(); 
 }
 
@@ -1060,50 +1108,30 @@ function r_drawCow(x, y) {
 
 function r_drawTree(x, y) { 
   fill(90, 60, 40); rect(x - 5, y, 10, 30); 
-  fill(40, 130, 50); 
-  ellipse(x, y - 10, 60, 60); 
-  ellipse(x - 15, y + 5, 50, 50); 
-  ellipse(x + 15, y + 5, 50, 50); 
+  fill(40, 130, 50); ellipse(x, y - 10, 60, 60); 
+  ellipse(x - 15, y + 5, 50, 50); ellipse(x + 15, y + 5, 50, 50); 
 }
 
 function r_drawShop(x, y, isLeft) { 
   push(); translate(x, y); 
-  fill(200, 180, 150); 
-  rect(isLeft ? -20 : -40, -20, 60, 40); 
-  for(let i = 0; i < 6; i++) { 
-    fill(i%2==0 ? color(200,40,40) : color(240)); 
-    rect((isLeft ? -20 : -40) + i*10, -30, 10, 20); 
-  } 
-  fill(0); textSize(12); textAlign(CENTER); 
-  text(random() > 0.5 ? "CHAI" : "DHABA", isLeft ? 10 : -10, -5); 
+  fill(200, 180, 150); rect(isLeft ? -20 : -40, -20, 60, 40); 
+  for(let i = 0; i < 6; i++) { fill(i%2==0 ? color(200,40,40) : color(240)); rect((isLeft ? -20 : -40) + i*10, -30, 10, 20); } 
+  fill(0); textSize(12); textAlign(CENTER); text(random() > 0.5 ? "CHAI" : "DHABA", isLeft ? 10 : -10, -5); 
   pop(); 
 }
 
 function drawAutoRushGame() {
   push();
-  if (r_shakeTimer > 0) { 
-    translate(random(-8, 8), random(-8, 8)); 
-    r_shakeTimer--; 
-  }
+  if (r_shakeTimer > 0) { translate(random(-8, 8), random(-8, 8)); r_shakeTimer--; }
   
   background(85, 170, 75); 
-  fill(50, 50, 55); noStroke(); 
-  rect(r_cx - r_roadWidth/2, 0, r_roadWidth, r_H); 
+  fill(50, 50, 55); noStroke(); rect(r_cx - r_roadWidth/2, 0, r_roadWidth, r_H); 
   
-  fill(240, 200, 50); 
-  rect(r_cx - r_roadWidth/2 + 5, 0, 5, r_H); 
-  rect(r_cx + r_roadWidth/2 - 10, 0, 5, r_H);
+  fill(240, 200, 50); rect(r_cx - r_roadWidth/2 + 5, 0, 5, r_H); rect(r_cx + r_roadWidth/2 - 10, 0, 5, r_H);
   
-  stroke(255, 255, 255, 180); 
-  strokeWeight(4); 
-  drawingContext.setLineDash([30, 40]);
-  
-  let laneDiv1 = r_cx - r_roadWidth * 0.16; 
-  let laneDiv2 = r_cx + r_roadWidth * 0.16;
-  
-  line(laneDiv1, (r_roadOffset % 70) - 70, laneDiv1, r_H); 
-  line(laneDiv2, (r_roadOffset % 70) - 70, laneDiv2, r_H);
-  
+  stroke(255, 255, 255, 180); strokeWeight(4); drawingContext.setLineDash([30, 40]);
+  let laneDiv1 = r_cx - r_roadWidth * 0.16; let laneDiv2 = r_cx + r_roadWidth * 0.16;
+  line(laneDiv1, (r_roadOffset % 70) - 70, laneDiv1, r_H); line(laneDiv2, (r_roadOffset % 70) - 70, laneDiv2, r_H);
   drawingContext.setLineDash([]); noStroke();
 
   for (let s of r_scenery) { 
@@ -1111,15 +1139,17 @@ function drawAutoRushGame() {
     if (s.type === 'SHOP') r_drawShop(s.x, s.y, s.isLeft); 
   }
 
+  // Recover scale slowly if it fell into a pothole
+  if (r_player.scaleFactor < 1) {
+    r_player.scaleFactor = lerp(r_player.scaleFactor, 1, 0.05);
+  }
+
   if (r_state === 'START') {
     r_drawAuto(r_player.x, r_player.y);
     fill(0, 180); rect(0, 0, r_W, r_H); fill(255); textAlign(CENTER, CENTER);
-    textSize(min(r_W * 0.1, 50)); fill(255, 200, 50); 
-    text("RICKSHAW RUSH", r_cx, r_H * 0.3);
-    textSize(20); fill(255); 
-    text("DRAG LEFT/RIGHT to Steer\nHOLD SCREEN to Accelerate\nAVOID Traffic & Cows!", r_cx, r_H * 0.55);
-    textSize(24); fill(100, 255, 100); 
-    text("Tap to Start Racing", r_cx, r_H * 0.8);
+    textSize(min(r_W * 0.1, 50)); fill(255, 200, 50); text("HEXNOVA RUSH", r_cx, r_H * 0.3);
+    textSize(20); fill(255); text("DRAG LEFT/RIGHT to Steer\nHOLD SCREEN to Accelerate\nAVOID Traffic & Potholes!", r_cx, r_H * 0.55);
+    textSize(24); fill(100, 255, 100); text("Tap to Start Racing", r_cx, r_H * 0.8);
   } 
   else if (r_state === 'PLAY' || r_state === 'OVER') {
     
@@ -1129,29 +1159,14 @@ function drawAutoRushGame() {
 
       if (isPressing && !ignoringSteer) { 
         r_player.speed = lerp(r_player.speed, r_player.maxSpeed * r_speedMult, 0.05); 
-        if (frameCount % 4 === 0) {
-          r_particles.push({
-            x: r_player.x + random(-10, 10), y: r_player.y + 35, 
-            vx: random(-0.5, 0.5), vy: random(1, 3), 
-            life: 1, decay: 0.05, size: random(10, 20), color: [150, 150, 150]
-          });
-        } 
-      } else { 
-        r_player.speed = lerp(r_player.speed, r_player.minSpeed * r_speedMult, 0.03); 
-      }
+        if (frameCount % 4 === 0) { r_particles.push({x: r_player.x + random(-10, 10), y: r_player.y + 35, vx: random(-0.5, 0.5), vy: random(1, 3), life: 1, decay: 0.05, size: random(10, 20), color: [150, 150, 150]}); } 
+      } else { r_player.speed = lerp(r_player.speed, r_player.minSpeed * r_speedMult, 0.03); }
       
-      r_score += r_player.speed * 0.02; 
-      r_speedMult = 1 + (r_score / 1500);
+      r_score += r_player.speed * 0.02; r_speedMult = 1 + (r_score / 1500);
       
-      // Update High score
-      if (floor(r_score) > highScores.rush) {
-        highScores.rush = floor(r_score);
-        saveHighScores();
-      }
+      if (floor(r_score) > highScores.rush) { highScores.rush = floor(r_score); saveHighScores(); }
 
-      if (isPressing && !ignoringSteer) { 
-        r_player.x = lerp(r_player.x, constrain(mouseX, r_cx - r_roadWidth/2 + 25, r_cx + r_roadWidth/2 - 25), 0.1); 
-      }
+      if (isPressing && !ignoringSteer) { r_player.x = lerp(r_player.x, constrain(mouseX, r_cx - r_roadWidth/2 + 25, r_cx + r_roadWidth/2 - 25), 0.1); }
       
       if (r_player.invulnTimer > 0) r_player.invulnTimer--;
       r_roadOffset += r_player.speed;
@@ -1159,14 +1174,12 @@ function drawAutoRushGame() {
       if (frameCount % max(22, floor(65 / r_speedMult)) === 0) r_spawnObstacle();
       if (frameCount % 15 === 0) r_spawnScenery(-50);
       
-      for (let s of r_scenery) s.y += r_player.speed; 
-      r_scenery = r_scenery.filter(s => s.y < r_H + 100);
+      for (let s of r_scenery) s.y += r_player.speed; r_scenery = r_scenery.filter(s => s.y < r_H + 100);
 
       for (let i = r_obstacles.length - 1; i >= 0; i--) {
-        let obs = r_obstacles[i]; 
-        obs.y += (r_player.speed - obs.speed); 
+        let obs = r_obstacles[i]; obs.y += (r_player.speed - obs.speed); 
         
-        if (!obs.passed && obs.y > r_player.y) { 
+        if (!obs.passed && obs.y > r_player.y && obs.type !== 'POTHOLE') { 
           obs.passed = true; 
           if (dist(r_player.x, r_player.y, obs.x, obs.y) < 70) { 
             r_score += 20; 
@@ -1179,19 +1192,26 @@ function drawAutoRushGame() {
           r_lives--; 
           r_shakeTimer = 20; 
           r_player.invulnTimer = 60; 
-          r_spawnExplosion(r_player.x, r_player.y - 20); 
+          
+          if (obs.type === 'POTHOLE') {
+            r_player.scaleFactor = 0.1; // Fall inside the pothole
+          } else {
+            r_spawnExplosion(r_player.x, r_player.y - 20); 
+          }
+
           r_player.speed *= 0.3; 
           if (r_lives <= 0) r_state = 'OVER';
         }
         if (obs.y > r_H + 100) r_obstacles.splice(i, 1);
       }
-      
-      for (let p of r_particles) { 
-        p.x += p.vx; p.y += p.vy; p.life -= p.decay; 
-      } 
-      r_particles = r_particles.filter(p => p.life > 0);
+      for (let p of r_particles) { p.x += p.vx; p.y += p.vy; p.life -= p.decay; } r_particles = r_particles.filter(p => p.life > 0);
     }
     
+    // Draw Potholes first so they are under cars
+    for (let obs of r_obstacles) { 
+      if (obs.type === 'POTHOLE') r_drawPothole(obs.x, obs.y, obs.w, obs.h);
+    }
+
     for (let obs of r_obstacles) { 
       if (obs.type === 'CAR') r_drawCar(obs.x, obs.y, obs.color, true); 
       if (obs.type === 'TRUCK') r_drawTruck(obs.x, obs.y, obs.color); 
@@ -1200,32 +1220,14 @@ function drawAutoRushGame() {
     
     if (r_player.invulnTimer % 10 < 5) r_drawAuto(r_player.x, r_player.y);
 
-    for (let p of r_particles) { 
-      if (p.text) { 
-        fill(255, 255, 50, p.life * 255); textSize(18); textAlign(CENTER); text(p.text, p.x, p.y); 
-      } else { 
-        fill(p.color[0], p.color[1], p.color[2], p.life * 255); ellipse(p.x, p.y, p.size * p.life); 
-      } 
-    }
+    for (let p of r_particles) { if (p.text) { fill(255, 255, 50, p.life * 255); textSize(18); textAlign(CENTER); text(p.text, p.x, p.y); } else { fill(p.color[0], p.color[1], p.color[2], p.life * 255); ellipse(p.x, p.y, p.size * p.life); } }
 
     fill(0, 150); rect(0, 0, r_W, 60); 
     fill(255); textSize(24); 
+    textAlign(CENTER, CENTER); text(floor(r_score) + " M   |   High: " + highScores.rush, r_W / 2, 30); 
+    textAlign(LEFT, CENTER); text("LIVES: ", 20, 30); for (let i = 0; i < r_lives; i++) { fill(255, 50, 50); ellipse(110 + (i * 25), 30, 15, 15); }
     
-    textAlign(CENTER, CENTER); 
-    text(floor(r_score) + " M   |   High: " + highScores.rush, r_W / 2, 30); 
-    
-    textAlign(LEFT, CENTER); text("LIVES: ", 20, 30); 
-    for (let i = 0; i < r_lives; i++) { 
-      fill(255, 50, 50); ellipse(110 + (i * 25), 30, 15, 15); 
-    }
-    
-    if (r_state === 'OVER') { 
-      fill(0, 200); rect(0, 0, r_W, r_H); 
-      fill(255, 50, 50); textAlign(CENTER, CENTER); 
-      textSize(min(r_W * 0.12, 60)); text("CRASHED!", r_cx, r_H * 0.35); 
-      fill(255); textSize(26); text("Final Distance: " + floor(r_score) + " M", r_cx, r_H * 0.48); 
-      textSize(24); fill(100, 255, 100); text("Tap to Restart", r_cx, r_H * 0.7); 
-    }
+    if (r_state === 'OVER') { fill(0, 200); rect(0, 0, r_W, r_H); fill(255, 50, 50); textAlign(CENTER, CENTER); textSize(min(r_W * 0.12, 60)); text("CRASHED!", r_cx, r_H * 0.35); fill(255); textSize(26); text("Final Distance: " + floor(r_score) + " M", r_cx, r_H * 0.48); textSize(24); fill(100, 255, 100); text("Tap to Restart", r_cx, r_H * 0.7); }
   }
   pop();
 }
