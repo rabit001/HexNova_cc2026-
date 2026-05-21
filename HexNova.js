@@ -26,6 +26,15 @@ let kaataSound = new Audio('sound/kaata.mp3');
 let fahhhSound = new Audio('sound/fahhh.mp3');
 
 // ==========================================
+// IPL SOUND
+// ==========================================
+let iplSong = new Audio('sound/ipl.mp3');
+iplSong.loop = true;
+iplSong.volume = 0.5;
+
+let crowdCheer = new Audio('sound/crowd.mp3');
+crowdCheer.volume = 0.7;
+// ==========================================
 // HIGH SCORE SYSTEM
 // ==========================================
 let highScores = { kite: 0, cricket: 0, rush: 0 };
@@ -243,7 +252,8 @@ function mousePressed() {
     if (mouseX > 10 && mouseX < 110 && mouseY > 10 && mouseY < 50) {
       arcadeState = 'MENU';
       kiteSong.pause(); 
-      rickshawSong.pause(); // Pause Rickshaw song
+      rickshawSong.pause();
+      iplSong.pause(); // Pause Rickshaw song
       if (themeSong.paused) themeSong.play().catch(e=>{});
       return; 
     }
@@ -263,8 +273,11 @@ function mousePressed() {
           kiteSong.play().catch(e=>{}); 
         }
         if (card.id === 'CRICKET') { 
-          c_enterGame(); 
-        }
+  c_enterGame();
+
+  iplSong.currentTime = 0;
+  iplSong.play().catch(e=>{});
+}
         if (card.id === 'RUSH') { 
           r_resetGame(); 
           r_state = 'START'; 
