@@ -1,40 +1,59 @@
-# HexNova_cc2026
+# HexNova – Interactive Mini-Games
 
-## Project Overview
-This project is a collection of simple interactive mini-games built using p5.js.  
-The focus is on one-button gameplay with easy controls but engaging mechanics.
+HexNova is a collection of small interactive games created for the **Creative Coding Hackathon 2026** at Avantika University. The project explores simple controls, quick gameplay loops, and playful visual interactions using p5.js.
 
-## Games Included
+## Games
 
 ### Kite Drift Control
-A kite control game where the player manages height and movement.
+A kite-control game where the player manages the kite's movement and tries to stay in the air.
 
-- Click to move up  
-- No input causes the kite to fall  
-- Wind affects left-right movement  
-- Goal is to survive and score as long as possible  
+- Click to move the kite upward.
+- Without input, the kite gradually falls.
+- Wind influences horizontal movement.
+- The objective is to survive and score for as long as possible.
 
 ### Auto Rush
-A lane-based obstacle avoidance game.
+A lane-based obstacle-avoidance game built around an auto-rickshaw driving concept.
 
-- Click to switch lanes  
-- Avoid incoming obstacles  
-- Speed increases gradually  
-- Player has 3 lives  
+- Click to switch lanes.
+- Avoid incoming obstacles.
+- The game speed increases gradually.
+- The player has three lives.
 
-## Ideation
-We created hand-drawn sketches before development to plan gameplay and structure.
+## Built With
 
-## Tech Stack
-- p5.js  
-- HTML  
-- JavaScript  
+- [p5.js](https://p5js.org/)
+- HTML
+- JavaScript
 
-## Team
-Rabit Mansuri — Design and UI  
-Rudraksh Nagar — Game Logic  
+## Design Process
 
-## Current Progress
-- Ideas finalized  
-- Sketches completed  
-- Development in progress  
+The team explored game ideas and prepared hand-drawn sketches to plan the gameplay and visual structure before development.
+
+## Team Contributions
+
+| Team member | Contribution |
+| --- | --- |
+| Rabit Mansuri | Design and UI, gameplay ideation, and visual planning |
+| Rudraksh Nagar | Game logic |
+
+## Recognition
+
+**Second Place (Runner-up) – Creative Coding Hackathon 2026**  
+Avantika University · May 14, 2026
+
+## Repository Structure
+
+- `HexNova.js` – main p5.js sketch
+- `index.html` – HTML entry point
+- `js/`, `project/`, `sketch/`, `sound/` – supporting project assets and files
+
+## Run Locally
+
+1. Clone or download this repository.
+2. Open the project folder in a code editor.
+3. Open `index.html` in a browser. If the project uses browser restrictions for local assets, run it with a local development server.
+
+---
+
+This repository documents the team's hackathon project and its game concepts.
